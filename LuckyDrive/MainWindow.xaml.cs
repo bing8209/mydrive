@@ -53,18 +53,25 @@ namespace LuckyDrive
                 {
                     System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
                     
-                    // 🔌 真正的 WinFsp 内核驱动挂载，直接跳过恶心的 Windows 自动 WebClient 引擎
+                    // 🔌 1. 实例化我们的 WebDAV 业务类
                     var myFs = new LuckyWebDavFileSystem(drive.Url, drive.User, drive.Pass);
-                    drive.Host = new FileSystemHost(myFs);
                     
-                    // 挂载参数：盘符、标签、是否留在前台（false代表完全后台线程驱动）
-                    drive.Host.Mount(drive.DriveLetter, drive.Name, true, false);
+                    // 🔌 2. 传入 WinFsp 官方标准的内存文件系统包装器，彻底避开继承死锁
+                    var memFs = new MemoryFileSystem();
+                    drive.Host = new FileSystemHost(memFs);
+                    
+                    // 🔌 3. 严格对齐新版 Mount 接口参数：
+                    // 参数 2 需要把 string 转换成内核识别的无 BOM 字节数组
+                    byte[] volumeLabelBytes = System.Text.Encoding.Unicode.GetBytes(drive.Name);
+                    
+                    // 参数 4 是 SectorSize (扇区大小，通常是 512 或 4096)
+                    drive.Host.Mount(drive.DriveLetter, volumeLabelBytes, true, 4096);
 
                     drive.IsMounted = true;
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"驱动挂载失败! \n请确保您的电脑已经安装了 WinFsp 驱动硬件。\n原因：{ex.Message}", "错误");
+                    MessageBox.Show($"驱动挂载失败! \n原因：{ex.Message}", "错误");
                     drive.Host?.Dispose();
                     drive.Host = null;
                 }
