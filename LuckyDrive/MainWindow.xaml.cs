@@ -104,4 +104,98 @@ namespace LuckyDrive
             itemBorder.SetValue(Border.PaddingProperty, new Thickness(15));
             itemBorder.SetValue(Border.WidthProperty, 540.0);
 
-            FrameworkElementFactory itemStack = new Framework
+            FrameworkElementFactory itemStack = new FrameworkElementFactory(typeof(StackPanel));
+
+            // 网盘名字
+            FrameworkElementFactory txtTitle = new FrameworkElementFactory(typeof(TextBlock));
+            Binding bindName = new Binding("Name");
+            txtTitle.SetBinding(TextBlock.TextProperty, bindName);
+            txtTitle.SetValue(TextBlock.FontSizeProperty, 16.0);
+            txtTitle.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+            txtTitle.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0x22, 0x22, 0x22)));
+            itemStack.AppendChild(txtTitle);
+
+            // 盘符状态
+            FrameworkElementFactory txtStatus = new FrameworkElementFactory(typeof(TextBlock));
+            Binding bindStatusText = new Binding("StatusText");
+            txtStatus.SetBinding(TextBlock.TextProperty, bindStatusText);
+            Binding bindStatusColor = new Binding("StatusColor");
+            txtStatus.SetBinding(TextBlock.ForegroundProperty, bindStatusColor);
+            txtStatus.SetValue(TextBlock.FontSizeProperty, 13.0);
+            txtStatus.SetValue(TextBlock.MarginProperty, new Thickness(0, 5, 0, 10));
+            itemStack.AppendChild(txtStatus);
+
+            // 按钮操作廊
+            FrameworkElementFactory btnPanel = new FrameworkElementFactory(typeof(StackPanel));
+            btnPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+
+            FrameworkElementFactory bMount = new FrameworkElementFactory(typeof(Button));
+            Binding bindBtnText = new Binding("ButtonText");
+            bMount.SetBinding(Button.ContentProperty, bindBtnText);
+            Binding bindBtnBg = new Binding("ButtonBg");
+            bMount.SetBinding(Button.BackgroundProperty, bindBtnBg);
+            Binding bindId = new Binding("Id");
+            bMount.SetBinding(Button.TagProperty, bindId);
+            bMount.SetValue(Button.ForegroundProperty, Brushes.White);
+            
+            // 🛠️ 终极修正点：把错误的 FontWeightsProperty 改为正统的 FontWeightProperty (去掉复数 s)
+            bMount.SetValue(Button.FontWeightProperty, FontWeights.Bold);
+            
+            bMount.SetValue(Button.HeightProperty, 30.0);
+            bMount.SetValue(Button.WidthProperty, 80.0);
+            bMount.SetValue(Button.BorderThicknessProperty, new Thickness(0));
+            bMount.AddHandler(Button.ClickEvent, new RoutedEventHandler(BtnToggleMount_Click));
+            btnPanel.AppendChild(bMount);
+
+            FrameworkElementFactory bDel = new FrameworkElementFactory(typeof(Button));
+            bDel.SetValue(Button.ContentProperty, "删除卡片");
+            bDel.SetValue(Button.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0xF2, 0xF2, 0xF2)));
+            bDel.SetValue(Button.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)));
+            bDel.SetValue(Button.HeightProperty, 30.0);
+            bDel.SetValue(Button.WidthProperty, 80.0);
+            bDel.SetValue(Button.MarginProperty, new Thickness(10, 0, 0, 0));
+            bDel.SetValue(Button.BorderThicknessProperty, new Thickness(0));
+            bDel.AddHandler(Button.ClickEvent, new RoutedEventHandler(BtnDelete_Click));
+            btnPanel.AppendChild(bDel);
+
+            itemStack.AppendChild(btnPanel);
+            itemBorder.AppendChild(itemStack);
+
+            DataTemplate template = new DataTemplate();
+            template.VisualTree = itemBorder;
+            listDrives.ItemTemplate = template;
+
+            Grid.SetRow(listDrives, 1);
+            rightGrid.Children.Add(listDrives);
+
+            Grid.SetColumn(rightGrid, 1);
+            mainGrid.Children.Add(rightGrid);
+
+            this.Content = mainGrid;
+        }
+
+        private void RefreshAvailableDriveLetters()
+        {
+            try
+            {
+                var defaultLetters = new List<string> { "Z:", "Y:", "X:", "W:", "V:", "U:", "T:", "S:", "R:", "Q:" };
+                var availableLetters = new List<string>();
+
+                if (DriveList == null || DriveList.Count == 0)
+                {
+                    comboDrive.ItemsSource = defaultLetters;
+                    comboDrive.SelectedIndex = 0;
+                    return;
+                }
+
+                foreach (var letter in defaultLetters)
+                {
+                    bool isUsedInApp = false;
+                    foreach (var drive in DriveList)
+                    {
+                        if (drive != null && (drive.DriveLetter + ":") == letter)
+                        {
+                            isUsedInApp = true;
+                            break;
+                        }
+                    }
