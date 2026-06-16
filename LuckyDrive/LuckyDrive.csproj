@@ -14,7 +14,6 @@
 
   <ItemGroup>
     <PackageReference Include="FluentWPF" Version="0.10.2" />
-    <PackageReference Include="WinFsp.Net" Version="2.1.24051" />
-  </ItemGroup>
+    </ItemGroup>
 
 </Project>
