@@ -1,14 +1,36 @@
-# ... 前面的步骤保持不变 ...
+name: .NET Core Desktop Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
 
     - name: Build and Publish
       run: |
-        # 🚀 核心修改：去掉 -p:PublishSingleFile=true，改成标准的绿色文件夹发布
+        # 🚀 彻底开除 PublishSingleFile，走 100% 免疫系统拦截的绿色解压即用文件夹模式
         dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -o ./publish
 
     - name: Compress Release Artifact
       run: |
-        # 将整个 publish 文件夹压缩为 zip 包
         powershell Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_GreenFolder_Windows.zip
 
-    - name: Create Release
-      # ... 后续的上传步骤，记得把文件名改成 LuckyDrive_GreenFolder_Windows.zip
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: LuckyDrive_GreenFolder_Windows
+        path: ./LuckyDrive_GreenFolder_Windows.zip
