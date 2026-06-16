@@ -9,12 +9,17 @@
     
     <Grid Margin="15">
         <Grid.ColumnDefinitions>
+            <!-- 左侧：已有的盘符卡片列表 -->
             <ColumnDefinition Width="280"/>
+            <!-- 分割线 -->
             <ColumnDefinition Width="15"/>
+            <!-- 右侧：添加/编辑表单 -->
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Grid Grid.Column0="0">
+        <!-- ================= 左侧列表 ================= -->
+        <!-- 👇 核心修复：这里正确的属性是 Grid.Column="0" -->
+        <Grid Grid.Column="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -22,10 +27,12 @@
             
             <TextBlock Text="我的挂载盘符" FontSize="16" Foreground="White" FontWeight="Bold" Margin="0,0,0,10"/>
             
+            <!-- 盘符卡片列表 -->
             <ListBox Grid.Row="1" x:Name="ListDrives" Background="#15FFFFFF" BorderThickness="0" 
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="ListDrives_SelectionChanged">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
+                        <!-- 每张小卡片的样式 -->
                         <Border Background="#20FFFFFF" CornerRadius="6" Width="240" Margin="0,5" Padding="10">
                             <Grid>
                                 <StackPanel>
@@ -33,6 +40,7 @@
                                     <TextBlock Text="{Binding Url}" FontSize="11" Foreground="#A0FFFFFF" TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{Binding StatusColor}" Margin="0,5,0,0"/>
                                 </StackPanel>
+                                <!-- 卡片右侧的小开关按钮 -->
                                 <Button Content="{Binding ButtonText}" HorizontalAlignment="Right" VerticalAlignment="Center" 
                                         Padding="8,4" Background="{Binding ButtonBg}" Foreground="White" BorderThickness="0"
                                         Tag="{Binding Id}" Click="BtnToggleMount_Click"/>
@@ -43,6 +51,7 @@
             </ListBox>
         </Grid>
 
+        <!-- ================= 右侧表单 ================= -->
         <Grid Grid.Column="2">
             <StackPanel>
                 <TextBlock Text="配置详情" FontSize="16" Foreground="White" FontWeight="Bold" Margin="0,0,0,10"/>
@@ -84,6 +93,7 @@
                     </Grid>
                 </Border>
 
+                <!-- 操作按钮 -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
                     <Button Content="删除此盘" Width="80" Height="30" Background="Crimson" Foreground="White" BorderThickness="0" Margin="0,0,10,0" Click="BtnDelete_Click"/>
                     <Button Content="保存并新建" Width="100" Height="30" Background="#FF0078D4" Foreground="White" FontWeight="Bold" BorderThickness="0" Click="BtnSave_Click"/>
