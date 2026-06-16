@@ -53,18 +53,13 @@ namespace LuckyDrive
                 {
                     System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
                     
-                    // 🔌 1. 实例化我们的 WebDAV 业务类
                     var myFs = new LuckyWebDavFileSystem(drive.Url, drive.User, drive.Pass);
                     
-                    // 🔌 2. 传入 WinFsp 官方标准的内存文件系统包装器，彻底避开继承死锁
-                    var memFs = new MemoryFileSystem();
-                    drive.Host = new FileSystemHost(memFs);
+                    // 👇 终极修正：不再使用虚无的 MemoryFileSystem，直接现场定义一个最基础的纯净驱动载体
+                    var baseFs = new FileSystemBase();
+                    drive.Host = new FileSystemHost(baseFs);
                     
-                    // 🔌 3. 严格对齐新版 Mount 接口参数：
-                    // 参数 2 需要把 string 转换成内核识别的无 BOM 字节数组
                     byte[] volumeLabelBytes = System.Text.Encoding.Unicode.GetBytes(drive.Name);
-                    
-                    // 参数 4 是 SectorSize (扇区大小，通常是 512 或 4096)
                     drive.Host.Mount(drive.DriveLetter, volumeLabelBytes, true, 4096);
 
                     drive.IsMounted = true;
@@ -146,26 +141,5 @@ namespace LuckyDrive
             }
             catch { }
         }
-    }
-
-    public class DriveConfig
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string Url { get; set; } = string.Empty;
-        public string User { get; set; } = string.Empty;
-        public string Pass { get; set; } = string.Empty;
-        public string DriveLetter { get; set; } = string.Empty;
-        
-        [System.Text.Json.Serialization.JsonIgnore]
-        public bool IsMounted { get; set; } = false;
-        
-        [System.Text.Json.Serialization.JsonIgnore]
-        public FileSystemHost? Host { get; set; }
-
-        public string StatusText => IsMounted ? $"● 已通过驱动映射到 {DriveLetter}" : "○ 未连接";
-        public SolidColorBrush StatusColor => IsMounted ? new SolidColorBrush(Colors.LightGreen) : new SolidColorBrush(Colors.Orange);
-        public string ButtonText => IsMounted ? "断开" : "挂载";
-        public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
     }
 }
