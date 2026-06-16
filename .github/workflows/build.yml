@@ -1,8 +1,7 @@
 name: Build and Release Windows App
 
-# 触发条件修改：同时支持“手动网页点击”和“发版本自动触发”
 on:
-  workflow_dispatch: # 👈 添加这一行，GitHub 网页上就会出现手动运行的按钮了！
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
@@ -20,19 +19,21 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Restore Dependencies
-      run: dotnet restore LuckyDrive.sln
-
-    - name: Clean and Publish Single File Exe
+    # 👇 核心大招 1：强制彻底斩断 GitHub 的旧依赖缓存，100% 重新向微软拉取干净的依赖结构
+    - name: Restore Dependencies with No Cache
       run: |
-        dotnet clean LuckyDrive/LuckyDrive.csproj -c Release -r win-x64
+        dotnet restore LuckyDrive/LuckyDrive.csproj --runtime win-x64
+
+    # 👇 核心大招 2：直接采用平铺发布，不和临时缓存发生任何纠缠
+    - name: Publish Single File Exe
+      run: |
         dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
 
+    # 后续打包步骤保持原样
     - name: Compress Release Artifact
       run: |
         Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_Windows.zip
 
-    # 只有当通过打标签（Tag）推送到仓库时，才去创建正式的 GitHub Release 页面
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
@@ -41,7 +42,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # 如果你是手动点击按钮运行的，直接把编译好的文件作为附件存在 Action 页面供你下载
     - name: Upload Artifact (For Manual Run)
       if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
       uses: actions/upload-artifact@v4
