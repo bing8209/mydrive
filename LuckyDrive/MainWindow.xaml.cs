@@ -86,27 +86,4 @@ namespace LuckyDrive
             // ================== 右侧列表区域 ==================
             Grid rightGrid = new Grid { Margin = new Thickness(25) };
             rightGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            rightGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-            rightGrid.Children.Add(new TextBlock { Text = "我的 Lucky 网盘群", FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 20) });
-
-            listDrives = new ListBox { Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
-            listDrives.SelectionChanged += ListDrives_SelectionChanged;
-            ScrollViewer.SetHorizontalScrollBarVisibility(listDrives, ScrollBarVisibility.Disabled);
-
-            // 🚀 【绝对稳过特调】用最标准的 FrameworkElementFactory 生成两行数据流，移除了任何可能引发语法死角的 Grid 嵌套
-            FrameworkElementFactory itemBorder = new FrameworkElementFactory(typeof(Border));
-            itemBorder.SetValue(Border.BackgroundProperty, Brushes.White);
-            itemBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
-            itemBorder.SetValue(Border.MarginProperty, new Thickness(0, 0, 0, 10));
-            itemBorder.SetValue(Border.PaddingProperty, new Thickness(15));
-            itemBorder.SetValue(Border.WidthProperty, 540.0);
-
-            FrameworkElementFactory itemStack = new FrameworkElementFactory(typeof(StackPanel));
-
-            // 网盘名字
-            FrameworkElementFactory txtTitle = new FrameworkElementFactory(typeof(TextBlock));
-            txtTitle.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Name"));
-            txtTitle.SetValue(TextBlock.FontSizeProperty, 16.0);
-            txtTitle.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
-            txtTitle.SetValue(TextBlock.ForegroundProperty, new Solid
+            rightGrid.RowDefinitions.Add(new RowDefinition { Height
