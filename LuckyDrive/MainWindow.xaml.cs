@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -22,55 +21,61 @@ namespace LuckyDrive
             LoadConfig();
             ListDrives.ItemsSource = DriveList;
             
-            // 🚀 启动时刷新下拉框，加上金刚不坏的防崩溃保护
+            // 🚀 启动时刷新下拉框，使用最原始安全的逻辑
             RefreshAvailableDriveLetters();
         }
 
-        // 🚀 核心修正：加入超强 Try-Catch，哪怕电脑里有卡死的网络盘，也绝对不会导致软件打不开了！
+        // 🚀 彻底重构：不用任何 LINQ，不用 HashSet，改用最基础的 bool 数组布防，100% 免疫系统 AOT 剪裁闪退
         private void RefreshAvailableDriveLetters()
         {
             var availableLetters = new List<string>();
-            var existingDrives = new HashSet<string>();
+            
+            // 用一个长度为 26 的布尔数组代表 A-Z 是否被占用（默认全未占用 false）
+            bool[] occupied = new bool[26];
 
             try
             {
-                // 逐个安全获取盘符，一旦某个盘符响应超时或报错，直接跳过，绝不卡死
                 var allDrives = DriveInfo.GetDrives();
                 foreach (var d in allDrives)
                 {
                     try
                     {
-                        if (!string.IsNullOrEmpty(d.Name) && d.Name.Length >= 1)
+                        string name = d.Name;
+                        if (!string.IsNullOrEmpty(name) && name.Length >= 1)
                         {
-                            existingDrives.Add(d.Name.Substring(0, 1).ToUpper());
+                            char firstChar = char.ToUpper(name[0]);
+                            if (firstChar >= 'A' && firstChar <= 'Z')
+                            {
+                                int index = firstChar - 'A';
+                                occupied[index] = true; // 标记该字母已被占用
+                            }
                         }
                     }
-                    catch { } // 单个盘符获取失败，默默吃掉异常，继续下一个
+                    catch { } 
                 }
             }
-            catch
-            {
-                // 如果整个 GetDrives() 都崩溃了，直接清空，走下面的保底逻辑
-                existingDrives.Clear();
-            }
+            catch { }
 
-            // 生成最终可以使用的安全盘符列表
-            for (char c = 'Z'; c >= 'A'; c--) 
+            // 倒序倒查 Z 丢到 A，找出空闲的盘符
+            for (int i = 25; i >= 0; i--)
             {
-                string letter = c.ToString();
-                if (!existingDrives.Contains(letter))
+                if (!occupied[i])
                 {
-                    availableLetters.Add(letter + ":");
+                    char letter = (char)('A' + i);
+                    availableLetters.Add(letter.ToString() + ":");
                 }
             }
 
-            // 保底方案：如果全被占满了或者出了意外，强制塞入后排备用盘符
+            // 万一有意外，强制保底
             if (availableLetters.Count == 0)
             {
-                availableLetters.AddRange(new[] { "Z:", "Y:", "X:", "W:", "V:", "U:" });
+                availableLetters.Add("Z:");
+                availableLetters.Add("Y:");
+                availableLetters.Add("X:");
+                availableLetters.Add("W:");
             }
 
-            // 安全喂给界面组件
+            // 安全喂给 UI
             ComboDrive.ItemsSource = availableLetters;
             ComboDrive.SelectedIndex = 0; 
         }
@@ -83,6 +88,18 @@ namespace LuckyDrive
                 return;
             }
 
+            string targetLetter = ComboDrive.Text.Replace(":", "").Trim().ToUpper();
+
+            // 传统循环代替 LINQ Any()，防止剪裁带来的隐式闪退
+            foreach (var d in DriveList)
+            {
+                if (d.DriveLetter == targetLetter)
+                {
+                    MessageBox.Show($"盘符 {targetLetter}: 已经在你的网盘卡片列表中了，请换个字母！", "提示");
+                    return;
+                }
+            }
+
             var newDrive = new DriveConfig
             {
                 Id = Guid.NewGuid().ToString(),
@@ -90,15 +107,9 @@ namespace LuckyDrive
                 Url = TxtUrl.Text.Trim(),
                 User = TxtUser.Text.Trim(),
                 Pass = TxtPass.Password.Trim(),
-                DriveLetter = ComboDrive.Text.Replace(":", "").Trim().ToUpper(), 
+                DriveLetter = targetLetter, 
                 IsMounted = false
             };
-
-            if (DriveList.Any(d => d.DriveLetter == newDrive.DriveLetter))
-            {
-                MessageBox.Show($"盘符 {newDrive.DriveLetter}: 已经在你的网盘卡片列表中了，请换个字母！", "提示");
-                return;
-            }
 
             DriveList.Add(newDrive);
             SaveConfig();
@@ -108,8 +119,15 @@ namespace LuckyDrive
         private void BtnToggleMount_Click(object sender, RoutedEventArgs e)
         {
             var btn = (Button)sender;
+            if (btn.Tag == null) return;
+            
             string id = btn.Tag.ToString()!;
-            var drive = DriveList.FirstOrDefault(d => d.Id == id);
+            DriveConfig? drive = null;
+
+            foreach (var d in DriveList)
+            {
+                if (d.Id == id) { drive = d; break; }
+            }
 
             if (drive == null) return;
 
@@ -218,9 +236,13 @@ namespace LuckyDrive
             try
             {
                 var options = new JsonSerializerOptions { WriteIndented = true };
-                var saveList = DriveList.Select(d => new DriveConfig {
-                    Id = d.Id, Name = d.Name, Url = d.Url, User = d.User, Pass = d.Pass, DriveLetter = d.DriveLetter
-                }).ToList();
+                var saveList = new List<DriveConfig>();
+                foreach (var d in DriveList)
+                {
+                    saveList.Add(new DriveConfig {
+                        Id = d.Id, Name = d.Name, Url = d.Url, User = d.User, Pass = d.Pass, DriveLetter = d.DriveLetter
+                    });
+                }
                 File.WriteAllText(_configPath, JsonSerializer.Serialize(saveList, options));
             }
             catch { }
@@ -233,7 +255,7 @@ namespace LuckyDrive
                 if (File.Exists(_configPath))
                 {
                     var json = File.ReadAllText(_configPath);
-                    var list = JsonSerializer.Deserialize<System.Collections.Generic.List<DriveConfig>>(json);
+                    var list = JsonSerializer.Deserialize<List<DriveConfig>>(json);
                     if (list != null)
                     {
                         foreach (var item in list) DriveList.Add(item);
