@@ -1,12 +1,12 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Text.Json;
+using Fsp;
 
 namespace LuckyDrive
 {
@@ -31,7 +31,7 @@ namespace LuckyDrive
                 Url = TxtUrl.Text,
                 User = TxtUser.Text,
                 Pass = TxtPass.Password,
-                DriveLetter = ComboDrive.Text.Trim(':'), // 确保只有字母
+                DriveLetter = ComboDrive.Text.Contains(":") ? ComboDrive.Text : ComboDrive.Text + ":",
                 IsMounted = false
             };
 
@@ -49,61 +49,36 @@ namespace LuckyDrive
 
             if (!drive.IsMounted)
             {
-                // 👇 使用 Windows 自带的 net use 引擎挂载网络盘
                 try
                 {
-                    // 格式化 URL，Windows 挂载 WebDAV 喜欢标准的 http/https 链接
-                    string formattedUrl = drive.Url.Replace("\\", "/");
+                    System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
                     
-                    // 构建命令: net use Z: "http://your-ip:port" "password" /user:"username" /persistent:no
-                    string args = $"use {drive.DriveLetter}: \"{formattedUrl}\" \"{drive.Pass}\" /user:\"{drive.User}\" /persistent:no";
+                    // 🔌 真正的 WinFsp 内核驱动挂载，直接跳过恶心的 Windows 自动 WebClient 引擎
+                    var myFs = new LuckyWebDavFileSystem(drive.Url, drive.User, drive.Pass);
+                    drive.Host = new FileSystemHost(myFs);
                     
-                    var psi = new ProcessStartInfo("net", args)
-                    {
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        RedirectStandardError = true,
-                        RedirectStandardOutput = true
-                    };
+                    // 挂载参数：盘符、标签、是否留在前台（false代表完全后台线程驱动）
+                    drive.Host.Mount(drive.DriveLetter, drive.Name, true, false);
 
-                    using (var process = Process.Start(psi))
-                    {
-                        process?.WaitForExit();
-                        string error = process?.StandardError.ReadToEnd() ?? "";
-                        
-                        if (process?.ExitCode == 0 || error.Contains("已经连接") || error.Contains("1219"))
-                        {
-                            drive.IsMounted = true;
-                        }
-                        else
-                        {
-                            MessageBox.Show($"挂载失败！Windows 错误提示：\n{error}\n\n提示：请确保 Windows 的 WebClient 服务已开启。", "挂载失败");
-                        }
-                    }
+                    drive.IsMounted = true;
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"执行挂载命令时发生崩溃: {ex.Message}");
+                    MessageBox.Show($"驱动挂载失败! \n请确保您的电脑已经安装了 WinFsp 驱动硬件。\n原因：{ex.Message}", "错误");
+                    drive.Host?.Dispose();
+                    drive.Host = null;
                 }
             }
             else
             {
-                // 👇 断开挂载: net use Z: /delete /y
                 try
                 {
-                    string args = $"use {drive.DriveLetter}: /delete /y";
-                    var psi = new ProcessStartInfo("net", args)
-                    {
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    };
-                    using (var process = Process.Start(psi))
-                    {
-                        process?.WaitForExit();
-                    }
-                    drive.IsMounted = false;
+                    drive.Host?.Unmount();
+                    drive.Host?.Dispose();
+                    drive.Host = null;
                 }
                 catch { }
+                drive.IsMounted = false;
             }
 
             ListDrives.Items.Refresh();
@@ -131,7 +106,7 @@ namespace LuckyDrive
                 TxtUrl.Text = selected.Url;
                 TxtUser.Text = selected.User;
                 TxtPass.Password = selected.Pass;
-                ComboDrive.Text = selected.DriveLetter + ":";
+                ComboDrive.Text = selected.DriveLetter;
             }
         }
 
@@ -177,8 +152,11 @@ namespace LuckyDrive
         
         [System.Text.Json.Serialization.JsonIgnore]
         public bool IsMounted { get; set; } = false;
+        
+        [System.Text.Json.Serialization.JsonIgnore]
+        public FileSystemHost? Host { get; set; }
 
-        public string StatusText => IsMounted ? $"● 已映射到 {DriveLetter}:" : "○ 未连接";
+        public string StatusText => IsMounted ? $"● 已通过驱动映射到 {DriveLetter}" : "○ 未连接";
         public SolidColorBrush StatusColor => IsMounted ? new SolidColorBrush(Colors.LightGreen) : new SolidColorBrush(Colors.Orange);
         public string ButtonText => IsMounted ? "断开" : "挂载";
         public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
