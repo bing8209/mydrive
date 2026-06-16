@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Text.Json;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace LuckyDrive
 {
@@ -14,9 +15,6 @@ namespace LuckyDrive
     {
         public ObservableCollection<DriveConfig> DriveList { get; set; } = new ObservableCollection<DriveConfig>();
         private readonly string _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
-        
-        // 🚀 修改为 Windows 最标准的通用虚拟网络磁盘根目录（完美规避名称无效报错）
-        private readonly string _networkShortcutsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Network Shortcuts");
 
         public MainWindow()
         {
@@ -24,24 +22,73 @@ namespace LuckyDrive
             LoadConfig();
             ListDrives.ItemsSource = DriveList;
             
-            if (!Directory.Exists(_networkShortcutsPath)) Directory.CreateDirectory(_networkShortcutsPath);
+            // 🚀 启动时自动刷新下拉框，只把没被占用的空闲盘符展现出来
+            RefreshAvailableDriveLetters();
+        }
+
+        // 🚀 核心黑科技：扫描全盘，把 A-Z 已经被占用的全部剔除
+        private void RefreshAvailableDriveLetters()
+        {
+            try
+            {
+                // 获取当前系统所有已经存在的盘符（如 C:\, D:\）
+                var existingDrives = DriveInfo.GetDrives().Select(d => d.Name.Substring(0, 1).ToUpper()).HashSet();
+                
+                var availableLetters = new List<string>();
+                for (char c = 'Z'; c >= 'A'; c--) // 从 Z 倒着往前排，通常后面的字母更不容易被硬件占用
+                {
+                    string letter = c.ToString();
+                    if (!existingDrives.Contains(letter))
+                    {
+                        availableLetters.Add(letter + ":");
+                    }
+                }
+
+                // 把过滤后的空闲盘符喂给界面的下拉选择框
+                ComboDrive.ItemsSource = availableLetters;
+                if (availableLetters.Count > 0)
+                {
+                    ComboDrive.SelectedIndex = 0; // 默认自动帮你选中第一个绝对可用的空闲盘符
+                }
+            }
+            catch
+            {
+                // 备用方案：如果扫描失败，依然显示默认的几个
+                ComboDrive.ItemsSource = new List<string> { "X:", "Y:", "Z:", "W:", "V:", "U:" };
+            }
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
+            if (string.IsNullOrEmpty(ComboDrive.Text))
+            {
+                MessageBox.Show("请选择或输入一个可用的盘符字母！", "提示");
+                return;
+            }
+
             var newDrive = new DriveConfig
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = TxtName.Text,
-                Url = TxtUrl.Text,
-                User = TxtUser.Text,
-                Pass = TxtPass.Password,
-                DriveLetter = ComboDrive.Text.Replace(":", "").Trim(), // 彻底过滤冒号，只保留纯字母如 "X"
+                Url = TxtUrl.Text.Trim(),
+                User = TxtUser.Text.Trim(),
+                Pass = TxtPass.Password.Trim(),
+                DriveLetter = ComboDrive.Text.Replace(":", "").Trim().ToUpper(), // 剥离冒号，锁死单字母
                 IsMounted = false
             };
 
+            // 检查是不是跟现有的卡片盘符冲突了
+            if (DriveList.Any(d => d.DriveLetter == newDrive.DriveLetter))
+            {
+                MessageBox.Show($"盘符 {newDrive.DriveLetter}: 已经在你的网盘卡片列表中了，请换个字母！", "提示");
+                return;
+            }
+
             DriveList.Add(newDrive);
             SaveConfig();
+            
+            // 刷新一下可用列表
+            RefreshAvailableDriveLetters();
         }
 
         private void BtnToggleMount_Click(object sender, RoutedEventArgs e)
@@ -52,88 +99,77 @@ namespace LuckyDrive
 
             if (drive == null) return;
 
-            // 🛠️ 核心修正：使用合法的文件名字符，彻底解决“目录名称无效”
-            string safeFolderName = $"{drive.Name}_{drive.DriveLetter}";
-            string targetFolder = Path.Combine(_networkShortcutsPath, safeFolderName);
-
             if (!drive.IsMounted)
             {
                 try
                 {
-                    if (Directory.Exists(targetFolder)) Directory.Delete(targetFolder, true);
-                    Directory.CreateDirectory(targetFolder);
+                    string uriString = drive.Url;
+                    if (!uriString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                    {
+                        uriString = "http://" + uriString;
+                    }
 
-                    // 🧬 100% 纯正 Windows 虚拟位置映射协议：
-                    string iniPath = Path.Combine(targetFolder, "desktop.ini");
-                    string[] iniContent = {
-                        "[.ShellClassInfo]",
-                        "CLSID2={00021439-0000-0000-C000-00000000046}", // 网络位置外壳ID
-                        "Flags=1",
-                        "ConfirmFileOp=0"
-                    };
-                    File.WriteAllLines(iniPath, iniContent);
+                    Uri uri = new Uri(uriString);
+                    string host = uri.Host;
+                    int port = uri.Port;
+                    string path = uri.AbsolutePath.Replace("/", "\\").Trim('\\');
 
-                    // 🧬 专门存放网络链接的底层目标配置文件
-                    string targetInfoPath = Path.Combine(targetFolder, "target.lnk");
+                    string uncPath = (port == 80 || port == 443) 
+                        ? $"\\\\{host}\\{path}" 
+                        : $"\\\\{host}@{port}\\{path}";
+
+                    string args = $"use {drive.DriveLetter}: \"{uncPath}\" \"{drive.Pass}\" /user:\"{drive.User}\" /persistent:no";
                     
-                    // 动态调用后台无感脚本快速生成标准快捷位置，100% 免疫各种奇葩路径报错
-                    CreateNetworkShortcut(targetFolder, drive.Url);
+                    var psi = new ProcessStartInfo("net", args)
+                    {
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        RedirectStandardError = true
+                    };
 
-                    // 赋予系统级与隐藏属性，强制让 Windows 资源管理器刷新出漂亮的图标
-                    File.SetAttributes(iniPath, FileAttributes.Hidden | FileAttributes.System);
-                    File.SetAttributes(targetFolder, FileAttributes.ReadOnly | FileAttributes.System);
+                    using (var process = Process.Start(psi))
+                    {
+                        process?.WaitForExit();
+                        string error = process?.StandardError.ReadToEnd() ?? "";
 
-                    // 瞬间弹出此电脑的“网络位置”展示
-                    Process.Start("explorer.exe", _networkShortcutsPath);
-
-                    drive.IsMounted = true;
+                        if (process?.ExitCode == 0 || error.Contains("1219") || error.Contains("已经连接"))
+                        {
+                            drive.IsMounted = true;
+                            Process.Start("explorer.exe", $"{drive.DriveLetter}:");
+                        }
+                        else
+                        {
+                            if (error.Contains("67") || error.Contains("网络名"))
+                            {
+                                MessageBox.Show("挂载失败！检测到您的 Windows 系统未开启 WebClient 组件。\n\n解决办法：\n请在键盘按 Win+R 输入 services.msc，把【WebClient】服务的启动类型改为【自动】并点击【启动】即可！", "提示");
+                            }
+                            else
+                            {
+                                MessageBox.Show($"挂载失败，Windows 系统内核提示：\n{error}", "提示");
+                            }
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"虚拟映射失败! \n原因：{ex.Message}", "错误");
+                    MessageBox.Show($"挂载崩溃: {ex.Message}");
                 }
             }
             else
             {
                 try
                 {
-                    if (Directory.Exists(targetFolder))
-                    {
-                        File.SetAttributes(targetFolder, FileAttributes.Normal);
-                        Directory.Delete(targetFolder, true);
-                    }
+                    string args = $"use {drive.DriveLetter}: /delete /y";
+                    var psi = new ProcessStartInfo("net", args) { CreateNoWindow = true, UseShellExecute = false };
+                    using (var process = Process.Start(psi)) process?.WaitForExit();
+                    
+                    drive.IsMounted = false;
                 }
                 catch { }
-                drive.IsMounted = false;
             }
 
             ListDrives.Items.Refresh();
-        }
-
-        // 🚀 后台全自动网络映射链接生成引擎，无需任何驱动，底层极其稳健
-        private void CreateNetworkShortcut(string folderPath, string url)
-        {
-            try
-            {
-                string vbsPath = Path.Combine(Path.GetTempPath(), "create_link.vbs");
-                string vbsContent = $@"
-Set sh = CreateObject(""WScript.Shell"")
-Set link = sh.CreateShortcut(""{folderPath.Replace("\\", "\\\\")}\\target.lnk"")
-link.TargetPath = ""{url}""
-link.Save
-";
-                File.WriteAllText(vbsPath, vbsContent, System.Text.Encoding.GetEncoding("gb2312"));
-                
-                var psi = new ProcessStartInfo("wscript.exe", $"\"{vbsPath}\"")
-                {
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                };
-                using (var p = Process.Start(psi)) p?.WaitForExit();
-                
-                if (File.Exists(vbsPath)) File.Delete(vbsPath);
-            }
-            catch { }
+            RefreshAvailableDriveLetters(); // 状态改变后重新刷新空闲盘符
         }
 
         private void BtnDelete_Click(object sender, RoutedEventArgs e)
@@ -147,6 +183,7 @@ link.Save
                 }
                 DriveList.Remove(selected);
                 SaveConfig();
+                RefreshAvailableDriveLetters();
             }
         }
 
@@ -158,7 +195,7 @@ link.Save
                 TxtUrl.Text = selected.Url;
                 TxtUser.Text = selected.User;
                 TxtPass.Password = selected.Pass;
-                ComboDrive.Text = selected.DriveLetter;
+                ComboDrive.Text = selected.DriveLetter + ":";
             }
         }
 
@@ -205,9 +242,9 @@ link.Save
         [System.Text.Json.Serialization.JsonIgnore]
         public bool IsMounted { get; set; } = false;
 
-        public string StatusText => IsMounted ? $"● 已连接到网络位置 ({DriveLetter})" : "○ 未连接";
+        public string StatusText => IsMounted ? $"● 已映射到虚拟磁盘 {DriveLetter}:" : "○ 未连接";
         public SolidColorBrush StatusColor => IsMounted ? new SolidColorBrush(Colors.LightGreen) : new SolidColorBrush(Colors.Orange);
-        public string ButtonText => IsMounted ? "断开" : "连接";
+        public string ButtonText => IsMounted ? "断开" : "挂载";
         public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
     }
 }
