@@ -62,7 +62,8 @@ namespace LuckyDrive
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"盘符 {drive.DriveLetter} 真正挂载失败! \n请检查WinFsp驱动或网络。\n{ex.Message}", "错误");
+                    // 👇 核心修复：修改为正宗的 C# 弹窗标准语法，彻底消灭编译报错
+                    MessageBox.Show($"盘符 {drive.DriveLetter} 真正挂载失败! \n请检查WinFsp驱动或网络。\n{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             else
@@ -157,9 +158,6 @@ namespace LuckyDrive
         public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
     }
 
-    // =======================================================
-    // 完整的 WinFsp 零缓存核心流式搬运工
-    // =======================================================
     public class LuckyWebDavFileSystem : FileSystemBase
     {
         private readonly string _url;
@@ -209,7 +207,7 @@ namespace LuckyDrive
         public override int GetVolumeInfo(out VolumeInfo volumeInfo)
         {
             volumeInfo = default;
-            volumeInfo.TotalSize = 50ULL * 1024 * 1024 * 1024; // 伪装 50GB
+            volumeInfo.TotalSize = 50ULL * 1024 * 1024 * 1024;
             volumeInfo.FreeSize = 25ULL * 1024 * 1024 * 1024;
             volumeInfo.SetVolumeLabel("LuckyDrive");
             return STATUS_SUCCESS;
