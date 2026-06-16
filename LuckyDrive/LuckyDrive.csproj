@@ -5,7 +5,6 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-
     <UseWPF>true</UseWPF>
     
     <PublishSingleFile>true</PublishSingleFile>
@@ -14,5 +13,10 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <IncludeNativeLibrariesForSelfContained>true</IncludeNativeLibrariesForSelfContained>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Page Remove="MainWindow.xaml" />
+    <None Include="MainWindow.xaml" />
+  </ItemGroup>
 
 </Project>
