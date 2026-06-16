@@ -7,16 +7,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     
+    <StartupObject>LuckyDrive.Program</StartupObject>
+
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishReadyToRun>false</PublishReadyToRun>
     <IncludeNativeLibrariesForSelfContained>true</IncludeNativeLibrariesForSelfContained>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Page Remove="MainWindow.xaml" />
-    <None Include="MainWindow.xaml" />
-  </ItemGroup>
 
 </Project>
