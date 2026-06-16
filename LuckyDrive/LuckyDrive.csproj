@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWpf>true</UseWpf>
@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="FluentWPF" Version="0.10.2" />
-    <PackageReference Include="WinFsp.Net" Version="2.0.23341" />
+    <PackageReference Include="WinFsp.Net" Version="2.1.24051" />
   </ItemGroup>
 
 </Project>
