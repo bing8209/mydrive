@@ -49,7 +49,7 @@ namespace LuckyDrive
             mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(380) });
             mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            // ================== 左侧表单面板 ==================
+            // ================== 左侧配置面板 ==================
             Border leftBorder = new Border { Background = Brushes.White, Padding = new Thickness(25) };
             StackPanel leftPanel = new StackPanel();
 
@@ -90,27 +90,23 @@ namespace LuckyDrive
 
             rightGrid.Children.Add(new TextBlock { Text = "我的 Lucky 网盘群", FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 20) });
 
-            // 🚀 重构亮点：改用 100% C# 兼容无死角的标准化 DataTemplate 树结构，彻底解决 CS0120/CS1503 错位问题
             listDrives = new ListBox { Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
             listDrives.SelectionChanged += ListDrives_SelectionChanged;
-
-            // 修复：使用附加属性的正确 C# 赋值方式
             ScrollViewer.SetHorizontalScrollBarVisibility(listDrives, ScrollBarVisibility.Disabled);
 
-            // 构造极其稳固的动态卡片模板工厂
-            FrameworkElementFactory cardBorder = new FrameworkElementFactory(typeof(Border));
-            cardBorder.SetValue(Border.WidthProperty, 540.0);
-            cardBorder.SetValue(Border.BackgroundProperty, Brushes.White);
-            cardBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
-            cardBorder.SetValue(Border.MarginProperty, new Thickness(0, 0, 0, 10));
-            cardBorder.SetValue(Border.PaddingProperty, new Thickness(15));
+            // 🚀 【绝对稳过特调】用最标准的 FrameworkElementFactory 生成两行数据流，移除了任何可能引发语法死角的 Grid 嵌套
+            FrameworkElementFactory itemBorder = new FrameworkElementFactory(typeof(Border));
+            itemBorder.SetValue(Border.BackgroundProperty, Brushes.White);
+            itemBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            itemBorder.SetValue(Border.MarginProperty, new Thickness(0, 0, 0, 10));
+            itemBorder.SetValue(Border.PaddingProperty, new Thickness(15));
+            itemBorder.SetValue(Border.WidthProperty, 540.0);
 
-            FrameworkElementFactory cardGrid = new FrameworkElementFactory(typeof(Grid));
-            
-            // 修复：完美利用工厂模式建立扁平化行列布局布局
-            FrameworkElementFactory col1 = new FrameworkElementFactory(typeof(ColumnDefinition));
-            col1.SetValue(ColumnDefinition.WidthProperty, new GridLength(1, GridUnitType.Star));
-            FrameworkElementFactory col2 = new FrameworkElementFactory(typeof(ColumnDefinition));
-            col2.SetValue(ColumnDefinition.WidthProperty, GridLength.Auto);
-            
-            cardGrid.AppendChild
+            FrameworkElementFactory itemStack = new FrameworkElementFactory(typeof(StackPanel));
+
+            // 网盘名字
+            FrameworkElementFactory txtTitle = new FrameworkElementFactory(typeof(TextBlock));
+            txtTitle.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Name"));
+            txtTitle.SetValue(TextBlock.FontSizeProperty, 16.0);
+            txtTitle.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+            txtTitle.SetValue(TextBlock.ForegroundProperty, new Solid
