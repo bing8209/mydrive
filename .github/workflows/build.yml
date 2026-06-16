@@ -19,26 +19,25 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    # 👇 核心大招 1：强制彻底斩断 GitHub 的旧依赖缓存，100% 重新向微软拉取干净的依赖结构
-    - name: Restore Dependencies with No Cache
+    - name: Restore Dependencies
       run: |
-        dotnet restore LuckyDrive/LuckyDrive.csproj --runtime win-x64
+        dotnet restore LuckyDrive/LuckyDrive.csproj -r win-x64
 
-    # 👇 核心大招 2：直接采用平铺发布，不和临时缓存发生任何纠缠
-    - name: Publish Single File Exe
+    # 👇 终极改动：删掉所有 -p:PublishSingleFile 语法，改用最传统的标准绿色版发布
+    - name: Publish Regular Green Version
       run: |
-        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
+        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -o ./publish
 
-    # 后续打包步骤保持原样
+    # 把整个生成的标准文件夹打包成 ZIP
     - name: Compress Release Artifact
       run: |
-        Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_Windows.zip
+        Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_Green_Windows.zip
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
-        files: ./LuckyDrive_Windows.zip
+        files: ./LuckyDrive_Green_Windows.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -46,5 +45,5 @@ jobs:
       if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
       uses: actions/upload-artifact@v4
       with:
-        name: LuckyDrive-Windows-Build
-        path: ./LuckyDrive_Windows.zip
+        name: LuckyDrive-Green-Windows
+        path: ./LuckyDrive_Green_Windows.zip
