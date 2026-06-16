@@ -3,15 +3,19 @@ using System.Windows;
 
 namespace LuckyDrive
 {
-    public partial class App : Application
+    // 🚀 建立一个纯 C# 的正统启动引擎，彻底跟 XAML 编译器说再见
+    public class Program
     {
-        protected override void OnStartup(StartupEventArgs e)
+        [STAThread] // WPF 必须的单线程公寓标记
+        public static void Main()
         {
-            base.OnStartup(e);
+            Application app = new Application();
             
-            // 🚀 核心关键：手动在内存里强行实例并展示我们纯 C# 的 MainWindow 窗口
+            // 内存中直接实例化我们之前写好的纯 C# 渲染的主窗体
             MainWindow mainWindow = new MainWindow();
-            mainWindow.Show();
+            
+            // 启动程序并展示主界面
+            app.Run(mainWindow);
         }
     }
 }
