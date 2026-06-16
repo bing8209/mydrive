@@ -2,8 +2,6 @@ using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -156,74 +154,5 @@ namespace LuckyDrive
         public SolidColorBrush StatusColor => IsMounted ? new SolidColorBrush(Colors.LightGreen) : new SolidColorBrush(Colors.Orange);
         public string ButtonText => IsMounted ? "断开" : "挂载";
         public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
-    }
-
-    public class LuckyWebDavFileSystem : FileSystemBase
-    {
-        private readonly string _url;
-        private readonly string _user;
-        private readonly string _pass;
-        private readonly HttpClient _http;
-
-        public LuckyWebDavFileSystem(string url, string user, string pass)
-        {
-            _url = url.EndsWith("/") ? url : url + "/";
-            _user = user;
-            _pass = pass;
-
-            _http = new HttpClient();
-            var authToken = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{_user}:{_pass}"));
-            _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
-        }
-
-        // 👇 核心修复：将底层的流式读取改为安全的 Task 异步包裹块，彻底移除引发玄学编译报错的旧点
-        public override int Read(object fileDesc, IntPtr buffer, long offset, uint length, out uint bytesRead)
-        {
-            string fileName = (string)fileDesc;
-            uint tempBytesRead = 0;
-
-            int result = Task.Run(async () =>
-            {
-                try
-                {
-                    var request = new HttpRequestMessage(HttpMethod.Get, _url + fileName.TrimStart('\\').Replace('\\', '/'));
-                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, offset + length - 1);
-
-                    using (var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
-                    {
-                        if (response.IsSuccessStatusCode)
-                        {
-                            var data = await response.Content.ReadAsByteArrayAsync();
-                            System.Runtime.InteropServices.Marshal.Copy(data, 0, buffer, data.Length);
-                            tempBytesRead = (uint)data.Length;
-                            return STATUS_SUCCESS;
-                        }
-                    }
-                    return STATUS_UNSUCCESSFUL;
-                }
-                catch
-                {
-                    return STATUS_UNSUCCESSFUL;
-                }
-            }).GetAwaiter().GetResult();
-
-            bytesRead = tempBytesRead;
-            return result;
-        }
-
-        public override int GetVolumeInfo(out VolumeInfo volumeInfo)
-        {
-            volumeInfo = default;
-            volumeInfo.TotalSize = 50ULL * 1024 * 1024 * 1024;
-            volumeInfo.FreeSize = 25ULL * 1024 * 1024 * 1024;
-            volumeInfo.SetVolumeLabel("LuckyDrive");
-            return STATUS_SUCCESS;
-        }
-
-        public override int Open(string fileName, uint createOptions, uint grantedAccess, out object fileDesc)
-        {
-            fileDesc = fileName;
-            return STATUS_SUCCESS;
-        }
     }
 }
