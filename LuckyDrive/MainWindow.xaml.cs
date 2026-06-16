@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -62,7 +63,6 @@ namespace LuckyDrive
                 }
                 catch (Exception ex)
                 {
-                    // 👇 核心修复：修改为正宗的 C# 弹窗标准语法，彻底消灭编译报错
                     MessageBox.Show($"盘符 {drive.DriveLetter} 真正挂载失败! \n请检查WinFsp驱动或网络。\n{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -176,32 +176,39 @@ namespace LuckyDrive
             _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
         }
 
+        // 👇 核心修复：将底层的流式读取改为安全的 Task 异步包裹块，彻底移除引发玄学编译报错的旧点
         public override int Read(object fileDesc, IntPtr buffer, long offset, uint length, out uint bytesRead)
         {
             string fileName = (string)fileDesc;
-            bytesRead = 0;
+            uint tempBytesRead = 0;
 
-            try
+            int result = Task.Run(async () =>
             {
-                var request = new HttpRequestMessage(HttpMethod.Get, _url + fileName.TrimStart('\\').Replace('\\', '/'));
-                request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, offset + length - 1);
-
-                using (var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead))
+                try
                 {
-                    if (response.IsSuccessStatusCode)
+                    var request = new HttpRequestMessage(HttpMethod.Get, _url + fileName.TrimStart('\\').Replace('\\', '/'));
+                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, offset + length - 1);
+
+                    using (var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
                     {
-                        var data = response.Content.ReadAsByteArrayAsync().Result;
-                        System.Runtime.InteropServices.Marshal.Copy(data, 0, buffer, data.Length);
-                        bytesRead = (uint)data.Length;
-                        return STATUS_SUCCESS;
+                        if (response.IsSuccessStatusCode)
+                        {
+                            var data = await response.Content.ReadAsByteArrayAsync();
+                            System.Runtime.InteropServices.Marshal.Copy(data, 0, buffer, data.Length);
+                            tempBytesRead = (uint)data.Length;
+                            return STATUS_SUCCESS;
+                        }
                     }
+                    return STATUS_UNSUCCESSFUL;
                 }
-                return STATUS_UNSUCCESSFUL;
-            }
-            catch
-            {
-                return STATUS_UNSUCCESSFUL;
-            }
+                catch
+                {
+                    return STATUS_UNSUCCESSFUL;
+                }
+            }).GetAwaiter().GetResult();
+
+            bytesRead = tempBytesRead;
+            return result;
         }
 
         public override int GetVolumeInfo(out VolumeInfo volumeInfo)
