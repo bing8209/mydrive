@@ -22,7 +22,7 @@ namespace LuckyDrive
             LoadConfig();
             ListDrives.ItemsSource = DriveList;
             
-            // 🚀 启动时自动刷新下拉框，只把没被占用的空闲盘符展现出来
+            // 启动时自动刷新下拉框，只把没被占用的空闲盘符展现出来
             RefreshAvailableDriveLetters();
         }
 
@@ -31,8 +31,8 @@ namespace LuckyDrive
         {
             try
             {
-                // 获取当前系统所有已经存在的盘符（如 C:\, D:\）
-                var existingDrives = DriveInfo.GetDrives().Select(d => d.Name.Substring(0, 1).ToUpper()).HashSet();
+                // 🛠️ 终极修正：将 .HashSet() 修正为 .ToHashSet()，完美通过编译
+                var existingDrives = DriveInfo.GetDrives().Select(d => d.Name.Substring(0, 1).ToUpper()).ToHashSet();
                 
                 var availableLetters = new List<string>();
                 for (char c = 'Z'; c >= 'A'; c--) // 从 Z 倒着往前排，通常后面的字母更不容易被硬件占用
@@ -135,116 +135,4 @@ namespace LuckyDrive
                         if (process?.ExitCode == 0 || error.Contains("1219") || error.Contains("已经连接"))
                         {
                             drive.IsMounted = true;
-                            Process.Start("explorer.exe", $"{drive.DriveLetter}:");
-                        }
-                        else
-                        {
-                            if (error.Contains("67") || error.Contains("网络名"))
-                            {
-                                MessageBox.Show("挂载失败！检测到您的 Windows 系统未开启 WebClient 组件。\n\n解决办法：\n请在键盘按 Win+R 输入 services.msc，把【WebClient】服务的启动类型改为【自动】并点击【启动】即可！", "提示");
-                            }
-                            else
-                            {
-                                MessageBox.Show($"挂载失败，Windows 系统内核提示：\n{error}", "提示");
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"挂载崩溃: {ex.Message}");
-                }
-            }
-            else
-            {
-                try
-                {
-                    string args = $"use {drive.DriveLetter}: /delete /y";
-                    var psi = new ProcessStartInfo("net", args) { CreateNoWindow = true, UseShellExecute = false };
-                    using (var process = Process.Start(psi)) process?.WaitForExit();
-                    
-                    drive.IsMounted = false;
-                }
-                catch { }
-            }
-
-            ListDrives.Items.Refresh();
-            RefreshAvailableDriveLetters(); // 状态改变后重新刷新空闲盘符
-        }
-
-        private void BtnDelete_Click(object sender, RoutedEventArgs e)
-        {
-            if (ListDrives.SelectedItem is DriveConfig selected)
-            {
-                if (selected.IsMounted)
-                {
-                    MessageBox.Show("请先断开该盘符的连接，再进行删除！", "提示");
-                    return;
-                }
-                DriveList.Remove(selected);
-                SaveConfig();
-                RefreshAvailableDriveLetters();
-            }
-        }
-
-        private void ListDrives_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (ListDrives.SelectedItem is DriveConfig selected)
-            {
-                TxtName.Text = selected.Name;
-                TxtUrl.Text = selected.Url;
-                TxtUser.Text = selected.User;
-                TxtPass.Password = selected.Pass;
-                ComboDrive.Text = selected.DriveLetter + ":";
-            }
-        }
-
-        private void SaveConfig()
-        {
-            try
-            {
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                var saveList = DriveList.Select(d => new DriveConfig {
-                    Id = d.Id, Name = d.Name, Url = d.Url, User = d.User, Pass = d.Pass, DriveLetter = d.DriveLetter
-                }).ToList();
-                File.WriteAllText(_configPath, JsonSerializer.Serialize(saveList, options));
-            }
-            catch { }
-        }
-
-        private void LoadConfig()
-        {
-            try
-            {
-                if (File.Exists(_configPath))
-                {
-                    var json = File.ReadAllText(_configPath);
-                    var list = JsonSerializer.Deserialize<System.Collections.Generic.List<DriveConfig>>(json);
-                    if (list != null)
-                    {
-                        foreach (var item in list) DriveList.Add(item);
-                    }
-                }
-            }
-            catch { }
-        }
-    }
-
-    public class DriveConfig
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string Url { get; set; } = string.Empty;
-        public string User { get; set; } = string.Empty;
-        public string Pass { get; set; } = string.Empty;
-        public string DriveLetter { get; set; } = string.Empty;
-        
-        [System.Text.Json.Serialization.JsonIgnore]
-        public bool IsMounted { get; set; } = false;
-
-        public string StatusText => IsMounted ? $"● 已映射到虚拟磁盘 {DriveLetter}:" : "○ 未连接";
-        public SolidColorBrush StatusColor => IsMounted ? new SolidColorBrush(Colors.LightGreen) : new SolidColorBrush(Colors.Orange);
-        public string ButtonText => IsMounted ? "断开" : "挂载";
-        public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
-    }
-}
+                            Process.
