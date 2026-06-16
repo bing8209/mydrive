@@ -55,7 +55,7 @@ namespace LuckyDrive
                     
                     var myFs = new LuckyWebDavFileSystem(drive.Url, drive.User, drive.Pass);
                     
-                    // 👇 终极修正：不再使用虚无的 MemoryFileSystem，直接现场定义一个最基础的纯净驱动载体
+                    // 🔌 现场使用绝对存在的基类作为驱动空壳载体
                     var baseFs = new FileSystemBase();
                     drive.Host = new FileSystemHost(baseFs);
                     
@@ -141,5 +141,27 @@ namespace LuckyDrive
             }
             catch { }
         }
+    }
+
+    // 👇 🪓 把它重新迎回来！核心卡片配置模型类
+    public class DriveConfig
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+        public string User { get; set; } = string.Empty;
+        public string Pass { get; set; } = string.Empty;
+        public string DriveLetter { get; set; } = string.Empty;
+        
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool IsMounted { get; set; } = false;
+        
+        [System.Text.Json.Serialization.JsonIgnore]
+        public FileSystemHost? Host { get; set; }
+
+        public string StatusText => IsMounted ? $"● 已通过驱动映射到 {DriveLetter}" : "○ 未连接";
+        public SolidColorBrush StatusColor => IsMounted ? new SolidColorBrush(Colors.LightGreen) : new SolidColorBrush(Colors.Orange);
+        public string ButtonText => IsMounted ? "断开" : "挂载";
+        public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
     }
 }
