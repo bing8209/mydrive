@@ -1,0 +1,45 @@
+name: Build and Release Windows App
+
+# 触发条件：当你向代码仓库推送（Push）带有 v 开头的标签（如 v1.0.0）时，自动启动打包
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    # 必须在微软官方的 Windows 虚拟机环境下运行编译
+    runs-on: windows-latest
+
+    steps:
+    # 1. 检出源代码到虚拟机
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # 2. 安装 .NET 8 SDK 环境
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    # 3. 恢复 NuGet 依赖包 (会在这里自动下载 FluentWPF 和 WinFsp.Net)
+    - name: Restore Dependencies
+      run: dotnet restore LuckyDrive.sln
+
+    # 4. 执行正式编译打包 (单文件发布，剪裁掉没用的体积)
+    - name: Publish Single File Exe
+      run: |
+        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -o ./publish
+
+    # 5. 把生成的打包文件夹压缩成 zip 准备上传
+    - name: Compress Release Artifact
+      run: |
+        Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_Windows.zip
+
+    # 6. 自动将生成的软件发布到 GitHub 的 Releases 页面中提供下载
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ./LuckyDrive_Windows.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
