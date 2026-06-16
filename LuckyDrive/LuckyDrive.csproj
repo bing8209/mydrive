@@ -7,6 +7,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWpf>true</UseWpf>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    
+    <AssemblyName>LuckyDriveApp</AssemblyName>
+    <RootNamespace>LuckyDrive</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
