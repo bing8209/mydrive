@@ -23,27 +23,28 @@ jobs:
       run: |
         dotnet restore LuckyDrive/LuckyDrive.csproj -r win-x64
 
-    # 👇 终极改动：删掉所有 -p:PublishSingleFile 语法，改用最传统的标准绿色版发布
-    - name: Publish Regular Green Version
+    - name: Publish Single File Exe
       run: |
-        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -o ./publish
+        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
 
-    # 把整个生成的标准文件夹打包成 ZIP
+    # 把独立的单文件发布版打包成带有高级感名字的 ZIP 压缩包
     - name: Compress Release Artifact
       run: |
-        Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_Green_Windows.zip
+        Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_SingleFile_Windows.zip
 
+    # 当你在 GitHub 搞 Git Tag（比如发版 v1.0.0）时，会自动在 Releases 页面吐出包
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
-        files: ./LuckyDrive_Green_Windows.zip
+        files: ./LuckyDrive_SingleFile_Windows.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    # 重点微调：当你只是在网页点击 [Run workflow] 手动测试时，它会完美把单文件上传到 Actions 结果页
     - name: Upload Artifact (For Manual Run)
       if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
       uses: actions/upload-artifact@v4
       with:
-        name: LuckyDrive-Green-Windows
-        path: ./LuckyDrive_Green_Windows.zip
+        name: LuckyDrive-SingleFile-Windows
+        path: ./LuckyDrive_SingleFile_Windows.zip
