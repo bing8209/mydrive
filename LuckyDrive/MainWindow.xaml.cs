@@ -137,10 +137,7 @@ namespace LuckyDrive
             Binding bindId = new Binding("Id");
             bMount.SetBinding(Button.TagProperty, bindId);
             bMount.SetValue(Button.ForegroundProperty, Brushes.White);
-            
-            // 🛠️ 终极修正点：把错误的 FontWeightsProperty 改为正统的 FontWeightProperty (去掉复数 s)
             bMount.SetValue(Button.FontWeightProperty, FontWeights.Bold);
-            
             bMount.SetValue(Button.HeightProperty, 30.0);
             bMount.SetValue(Button.WidthProperty, 80.0);
             bMount.SetValue(Button.BorderThicknessProperty, new Thickness(0));
@@ -152,50 +149,4 @@ namespace LuckyDrive
             bDel.SetValue(Button.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0xF2, 0xF2, 0xF2)));
             bDel.SetValue(Button.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)));
             bDel.SetValue(Button.HeightProperty, 30.0);
-            bDel.SetValue(Button.WidthProperty, 80.0);
-            bDel.SetValue(Button.MarginProperty, new Thickness(10, 0, 0, 0));
-            bDel.SetValue(Button.BorderThicknessProperty, new Thickness(0));
-            bDel.AddHandler(Button.ClickEvent, new RoutedEventHandler(BtnDelete_Click));
-            btnPanel.AppendChild(bDel);
-
-            itemStack.AppendChild(btnPanel);
-            itemBorder.AppendChild(itemStack);
-
-            DataTemplate template = new DataTemplate();
-            template.VisualTree = itemBorder;
-            listDrives.ItemTemplate = template;
-
-            Grid.SetRow(listDrives, 1);
-            rightGrid.Children.Add(listDrives);
-
-            Grid.SetColumn(rightGrid, 1);
-            mainGrid.Children.Add(rightGrid);
-
-            this.Content = mainGrid;
-        }
-
-        private void RefreshAvailableDriveLetters()
-        {
-            try
-            {
-                var defaultLetters = new List<string> { "Z:", "Y:", "X:", "W:", "V:", "U:", "T:", "S:", "R:", "Q:" };
-                var availableLetters = new List<string>();
-
-                if (DriveList == null || DriveList.Count == 0)
-                {
-                    comboDrive.ItemsSource = defaultLetters;
-                    comboDrive.SelectedIndex = 0;
-                    return;
-                }
-
-                foreach (var letter in defaultLetters)
-                {
-                    bool isUsedInApp = false;
-                    foreach (var drive in DriveList)
-                    {
-                        if (drive != null && (drive.DriveLetter + ":") == letter)
-                        {
-                            isUsedInApp = true;
-                            break;
-                        }
-                    }
+            bDel.SetValue(Button.Width
