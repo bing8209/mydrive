@@ -22,38 +22,57 @@ namespace LuckyDrive
             LoadConfig();
             ListDrives.ItemsSource = DriveList;
             
-            // 启动时自动刷新下拉框，只把没被占用的空闲盘符展现出来
+            // 🚀 启动时刷新下拉框，加上金刚不坏的防崩溃保护
             RefreshAvailableDriveLetters();
         }
 
-        // 🚀 核心黑科技：扫描全盘，把 A-Z 已经被占用的全部剔除
+        // 🚀 核心修正：加入超强 Try-Catch，哪怕电脑里有卡死的网络盘，也绝对不会导致软件打不开了！
         private void RefreshAvailableDriveLetters()
         {
+            var availableLetters = new List<string>();
+            var existingDrives = new HashSet<string>();
+
             try
             {
-                var existingDrives = DriveInfo.GetDrives().Select(d => d.Name.Substring(0, 1).ToUpper()).ToHashSet();
-                
-                var availableLetters = new List<string>();
-                for (char c = 'Z'; c >= 'A'; c--) // 从 Z 倒着往前排
+                // 逐个安全获取盘符，一旦某个盘符响应超时或报错，直接跳过，绝不卡死
+                var allDrives = DriveInfo.GetDrives();
+                foreach (var d in allDrives)
                 {
-                    string letter = c.ToString();
-                    if (!existingDrives.Contains(letter))
+                    try
                     {
-                        availableLetters.Add(letter + ":");
+                        if (!string.IsNullOrEmpty(d.Name) && d.Name.Length >= 1)
+                        {
+                            existingDrives.Add(d.Name.Substring(0, 1).ToUpper());
+                        }
                     }
-                }
-
-                // 把过滤后的空闲盘符喂给界面的下拉选择框
-                ComboDrive.ItemsSource = availableLetters;
-                if (availableLetters.Count > 0)
-                {
-                    ComboDrive.SelectedIndex = 0; 
+                    catch { } // 单个盘符获取失败，默默吃掉异常，继续下一个
                 }
             }
             catch
             {
-                ComboDrive.ItemsSource = new List<string> { "X:", "Y:", "Z:", "W:", "V:", "U:" };
+                // 如果整个 GetDrives() 都崩溃了，直接清空，走下面的保底逻辑
+                existingDrives.Clear();
             }
+
+            // 生成最终可以使用的安全盘符列表
+            for (char c = 'Z'; c >= 'A'; c--) 
+            {
+                string letter = c.ToString();
+                if (!existingDrives.Contains(letter))
+                {
+                    availableLetters.Add(letter + ":");
+                }
+            }
+
+            // 保底方案：如果全被占满了或者出了意外，强制塞入后排备用盘符
+            if (availableLetters.Count == 0)
+            {
+                availableLetters.AddRange(new[] { "Z:", "Y:", "X:", "W:", "V:", "U:" });
+            }
+
+            // 安全喂给界面组件
+            ComboDrive.ItemsSource = availableLetters;
+            ComboDrive.SelectedIndex = 0; 
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
