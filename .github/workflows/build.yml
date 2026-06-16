@@ -22,15 +22,16 @@ jobs:
 
     - name: Build and Publish
       run: |
-        # 🚀 彻底开除 PublishSingleFile，走 100% 免疫系统拦截的绿色解压即用文件夹模式
-        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -o ./publish
+        # 🚀 重新启用单文件发布，并且加入自包含，打出来就是一个独立的 LuckyDriveApp.exe
+        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true -o ./publish
 
     - name: Compress Release Artifact
       run: |
-        powershell Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_GreenFolder_Windows.zip
+        # 依旧打包成 zip，解压后里面就只有纯净的一个 exe 文件和皮肤配置
+        powershell Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_SingleFile_Windows.zip
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: LuckyDrive_GreenFolder_Windows
-        path: ./LuckyDrive_GreenFolder_Windows.zip
+        name: LuckyDrive_SingleFile_Windows
+        path: ./LuckyDrive_SingleFile_Windows.zip
