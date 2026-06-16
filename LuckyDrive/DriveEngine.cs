@@ -67,8 +67,9 @@ namespace LuckyDrive
         public override int GetVolumeInfo(out VolumeInfo volumeInfo)
         {
             volumeInfo = default;
-            volumeInfo.TotalSize = 50ULL * 1024 * 1024 * 1024;
-            volumeInfo.FreeSize = 25ULL * 1024 * 1024 * 1024;
+            // 👇 终极修复：把 50ULL 改为标准的 C# 64位无符号长整型后缀 50UL
+            volumeInfo.TotalSize = 50UL * 1024 * 1024 * 1024;
+            volumeInfo.FreeSize = 25UL * 1024 * 1024 * 1024;
             volumeInfo.SetVolumeLabel("LuckyDrive");
             return STATUS_SUCCESS;
         }
