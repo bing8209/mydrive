@@ -55,7 +55,9 @@ namespace LuckyDrive
                     
                     var myFs = new LuckyWebDavFileSystem(drive.Url, drive.User, drive.Pass);
                     drive.Host = new FileSystemHost(myFs);
-                    drive.Host.Mount(drive.DriveLetter, null, true, false);
+                    
+                    // 👇 修正：在 Mount 时候直接把 drive.Name 传进去作为系统盘符标签！
+                    drive.Host.Mount(drive.DriveLetter, drive.Name, true, false);
 
                     drive.IsMounted = true;
                 }
