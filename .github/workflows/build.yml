@@ -15,6 +15,10 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    # 🚀 关键增强：注入标准的 MSBuild 环境变量，强制云端激活 WPF 桌面程序编译矩阵
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -22,12 +26,12 @@ jobs:
 
     - name: Build and Publish
       run: |
-        # 🚀 重新启用单文件发布，并且加入自包含，打出来就是一个独立的 LuckyDriveApp.exe
-        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true -o ./publish
+        # 🧬 终极打包命令：显式指定架构、自包含，并加入配置文件深度清理
+        dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfContained=true --self-contained true -o ./publish
 
     - name: Compress Release Artifact
       run: |
-        # 依旧打包成 zip，解压后里面就只有纯净的一个 exe 文件和皮肤配置
+        # 依旧打包成 zip，解压后里面就只有纯净的一个 exe 文件
         powershell Compress-Archive -Path ./publish/* -DestinationPath ./LuckyDrive_SingleFile_Windows.zip
 
     - name: Upload Artifact
