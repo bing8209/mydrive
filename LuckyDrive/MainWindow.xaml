@@ -4,51 +4,91 @@
         xmlns:fw="clr-namespace:SourceChord.FluentWPF;assembly=FluentWPF"
         fw:AcrylicWindow.Enabled="True"
         fw:AcrylicWindow.AcrylicWindowStyle="NoIcon"
-        Title="LuckyDrive - 零缓存轻量虚拟盘" Height="400" Width="550" 
+        Title="LuckyDrive 多盘配置版" Height="500" Width="750" 
         Background="#501E1E1E" WindowStartupLocation="CenterScreen">
     
-    <Grid Margin="20">
-        <StackPanel>
-            <TextBlock Text="LuckyDrive 存储挂载" FontSize="22" Foreground="White" FontWeight="Bold" Margin="0,0,0,5"/>
-            <TextBlock Text="基于 WinFsp 内核 · 纯内存流式传输不伤固态" FontSize="12" Foreground="#A0FFFFFF" Margin="0,0,0,20"/>
+    <Grid Margin="15">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="15"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-            <Border Background="#20FFFFFF" CornerRadius="8" Padding="20">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+        <Grid Grid.Column0="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <TextBlock Text="我的挂载盘符" FontSize="16" Foreground="White" FontWeight="Bold" Margin="0,0,0,10"/>
+            
+            <ListBox Grid.Row="1" x:Name="ListDrives" Background="#15FFFFFF" BorderThickness="0" 
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="ListDrives_SelectionChanged">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="#20FFFFFF" CornerRadius="6" Width="240" Margin="0,5" Padding="10">
+                            <Grid>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock Text="{Binding Url}" FontSize="11" Foreground="#A0FFFFFF" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{Binding StatusColor}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                                <Button Content="{Binding ButtonText}" HorizontalAlignment="Right" VerticalAlignment="Center" 
+                                        Padding="8,4" Background="{Binding ButtonBg}" Foreground="White" BorderThickness="0"
+                                        Tag="{Binding Id}" Click="BtnToggleMount_Click"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="地址:" Foreground="White" VerticalAlignment="Center" Margin="0,10"/>
-                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="TxtUrl" Text="http://192.168.1.1:端口/dav" Padding="5" Background="#40000000" Foreground="White" BorderBrush="#40FFFFFF"/>
+        <Grid Grid.Column="2">
+            <StackPanel>
+                <TextBlock Text="配置详情" FontSize="16" Foreground="White" FontWeight="Bold" Margin="0,0,0,10"/>
+                
+                <Border Background="#20FFFFFF" CornerRadius="8" Padding="15">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="用户名:" Foreground="White" VerticalAlignment="Center" Margin="0,10"/>
-                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="TxtUser" Text="bing" Padding="5" Background="#40000000" Foreground="White" BorderBrush="#40FFFFFF"/>
+                        <TextBlock Grid.Row="0" Text="别名:" Foreground="White" VerticalAlignment="Center" Margin="0,8"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="TxtName" Text="我的Lucky" Padding="4" Background="#40000000" Foreground="White" BorderBrush="#40FFFFFF"/>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="密码:" Foreground="White" VerticalAlignment="Center" Margin="0,10"/>
-                    <PasswordBox Grid.Row="2" Grid.Column="1" x:Name="TxtPass" Padding="5" Background="#40000000" Foreground="White" BorderBrush="#40FFFFFF"/>
+                        <TextBlock Grid.Row="1" Text="地址:" Foreground="White" VerticalAlignment="Center" Margin="0,8"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TxtUrl" Text="http://192.168.1.1:端口/dav" Padding="4" Background="#40000000" Foreground="White" BorderBrush="#40FFFFFF"/>
 
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="挂载盘符:" Foreground="White" VerticalAlignment="Center" Margin="0,10"/>
-                    <ComboBox Grid.Row="3" Grid.Column="1" x:Name="ComboDrive" SelectedIndex="0" Width="60" HorizontalAlignment="Left" Padding="5">
-                        <ComboBoxItem Content="Z:"/>
-                        <ComboBoxItem Content="Y:"/>
-                        <ComboBoxItem Content="X:"/>
-                    </ComboBox>
-                </Grid>
-            </Border>
+                        <TextBlock Grid.Row="2" Text="用户名:" Foreground="White" VerticalAlignment="Center" Margin="0,8"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TxtUser" Text="bing" Padding="4" Background="#40000000" Foreground="White" BorderBrush="#40FFFFFF"/>
 
-            <Grid Margin="0,20,0,0">
-                <TextBlock x:Name="LblStatus" Text="状态: 未连接" Foreground="#FFFFCC00" VerticalAlignment="Center" FontSize="14"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="BtnConnect" Content="立即挂载" Width="100" Height="35" Background="#FF0078D4" Foreground="White" FontWeight="Bold" BorderThickness="0" Click="BtnConnect_Click"/>
+                        <TextBlock Grid.Row="3" Text="密码:" Foreground="White" VerticalAlignment="Center" Margin="0,8"/>
+                        <PasswordBox Grid.Row="3" Grid.Column="1" x:Name="TxtPass" Padding="4" Background="#40000000" Foreground="White" BorderBrush="#40FFFFFF"/>
+
+                        <TextBlock Grid.Row="4" Text="盘符:" Foreground="White" VerticalAlignment="Center" Margin="0,8"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="ComboDrive" SelectedIndex="0" Width="60" HorizontalAlignment="Left">
+                            <ComboBoxItem Content="Z:"/>
+                            <ComboBoxItem Content="Y:"/>
+                            <ComboBoxItem Content="X:"/>
+                            <ComboBoxItem Content="W:"/>
+                            <ComboBoxItem Content="V:"/>
+                        </ComboBox>
+                    </Grid>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                    <Button Content="删除此盘" Width="80" Height="30" Background="Crimson" Foreground="White" BorderThickness="0" Margin="0,0,10,0" Click="BtnDelete_Click"/>
+                    <Button Content="保存并新建" Width="100" Height="30" Background="#FF0078D4" Foreground="White" FontWeight="Bold" BorderThickness="0" Click="BtnSave_Click"/>
                 </StackPanel>
-            </Grid>
-        </StackPanel>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>
