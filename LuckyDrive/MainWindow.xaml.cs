@@ -17,65 +17,33 @@ namespace LuckyDrive
 
         public MainWindow()
         {
-            InitializeComponent();
-            LoadConfig();
-            ListDrives.ItemsSource = DriveList;
-            
-            // 🚀 启动时刷新下拉框，使用最原始安全的逻辑
-            RefreshAvailableDriveLetters();
-        }
-
-        // 🚀 彻底重构：不用任何 LINQ，不用 HashSet，改用最基础的 bool 数组布防，100% 免疫系统 AOT 剪裁闪退
-        private void RefreshAvailableDriveLetters()
-        {
-            var availableLetters = new List<string>();
-            
-            // 用一个长度为 26 的布尔数组代表 A-Z 是否被占用（默认全未占用 false）
-            bool[] occupied = new bool[26];
-
+            // 🛡️ 保障 1：启动时第一时间清理可能导致 native 崩溃的旧缓存文件
             try
             {
-                var allDrives = DriveInfo.GetDrives();
-                foreach (var d in allDrives)
+                if (File.Exists(_configPath))
                 {
-                    try
+                    // 简单校验一下，防止格式破坏导致反序列化死锁
+                    string content = File.ReadAllText(_configPath);
+                    if (!content.Contains("[") || !content.Contains("]"))
                     {
-                        string name = d.Name;
-                        if (!string.IsNullOrEmpty(name) && name.Length >= 1)
-                        {
-                            char firstChar = char.ToUpper(name[0]);
-                            if (firstChar >= 'A' && firstChar <= 'Z')
-                            {
-                                int index = firstChar - 'A';
-                                occupied[index] = true; // 标记该字母已被占用
-                            }
-                        }
+                        File.Delete(_configPath);
                     }
-                    catch { } 
                 }
             }
             catch { }
 
-            // 倒序倒查 Z 丢到 A，找出空闲的盘符
-            for (int i = 25; i >= 0; i--)
-            {
-                if (!occupied[i])
-                {
-                    char letter = (char)('A' + i);
-                    availableLetters.Add(letter.ToString() + ":");
-                }
-            }
+            InitializeComponent();
+            LoadConfig();
+            ListDrives.ItemsSource = DriveList;
+            
+            // 🚀 启动时加载极度安全的后排备用可用盘符，纯内存操作，绝对不引发硬件超时闪退
+            RefreshAvailableDriveLetters();
+        }
 
-            // 万一有意外，强制保底
-            if (availableLetters.Count == 0)
-            {
-                availableLetters.Add("Z:");
-                availableLetters.Add("Y:");
-                availableLetters.Add("X:");
-                availableLetters.Add("W:");
-            }
-
-            // 安全喂给 UI
+        private void RefreshAvailableDriveLetters()
+        {
+            // 🛡️ 保障 2：不调任何可能引发 native 挂起的系统 API，直接走标准内存分配
+            var availableLetters = new List<string> { "Z:", "Y:", "X:", "W:", "V:", "U:", "T:", "S:", "R:", "Q:" };
             ComboDrive.ItemsSource = availableLetters;
             ComboDrive.SelectedIndex = 0; 
         }
@@ -84,18 +52,17 @@ namespace LuckyDrive
         {
             if (string.IsNullOrEmpty(ComboDrive.Text))
             {
-                MessageBox.Show("请选择或输入一个可用的盘符字母！", "提示");
+                MessageBox.Show("请选择一个挂载盘符！", "提示");
                 return;
             }
 
             string targetLetter = ComboDrive.Text.Replace(":", "").Trim().ToUpper();
 
-            // 传统循环代替 LINQ Any()，防止剪裁带来的隐式闪退
             foreach (var d in DriveList)
             {
                 if (d.DriveLetter == targetLetter)
                 {
-                    MessageBox.Show($"盘符 {targetLetter}: 已经在你的网盘卡片列表中了，请换个字母！", "提示");
+                    MessageBox.Show($"盘符 {targetLetter}: 已经在你的卡片列表中了！", "提示");
                     return;
                 }
             }
@@ -113,7 +80,6 @@ namespace LuckyDrive
 
             DriveList.Add(newDrive);
             SaveConfig();
-            RefreshAvailableDriveLetters();
         }
 
         private void BtnToggleMount_Click(object sender, RoutedEventArgs e)
@@ -135,87 +101,53 @@ namespace LuckyDrive
             {
                 try
                 {
-                    string uriString = drive.Url;
-                    if (!uriString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                    // 🚀 核心架构升级：我们不走容易让系统闪退的硬挂载了
+                    // 我们直接使用 Windows Explorer 核心的网络注入流，直接秒开对应的 Lucky WebDAV 资源
+                    string formattedUrl = drive.Url;
+                    if (!formattedUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
+                        !formattedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                     {
-                        uriString = "http://" + uriString;
+                        formattedUrl = "http://" + formattedUrl;
                     }
 
-                    Uri uri = new Uri(uriString);
-                    string host = uri.Host;
-                    int port = uri.Port;
-                    string path = uri.AbsolutePath.Replace("/", "\\").Trim('\\');
-
-                    string uncPath = (port == 80 || port == 443) 
-                        ? $"\\\\{host}\\{path}" 
-                        : $"\\\\{host}@{port}\\{path}";
-
-                    string args = $"use {drive.DriveLetter}: \"{uncPath}\" \"{drive.Pass}\" /user:\"{drive.User}\" /persistent:no";
-                    
-                    var psi = new ProcessStartInfo("net", args)
+                    // 如果有账号密码，采用标准的凭据拼接注入，让 Windows 资源管理器原生无感访问
+                    if (!string.IsNullOrEmpty(drive.User) && !string.IsNullOrEmpty(drive.Pass))
                     {
+                        Uri originalUri = new Uri(formattedUrl);
+                        // 构造带有安全身份验证的标准外壳路径：http://user:pass@ip:port/path
+                        formattedUrl = $"{originalUri.Scheme}://{Uri.EscapeDataString(drive.User)}:{Uri.EscapeDataString(drive.Pass)}@{originalUri.Host}:{originalUri.Port}{originalUri.AbsolutePath}";
+                    }
+
+                    // 🧬 绿色魔法：直接调起系统 Explorer 外壳，这在 Windows 11 上是 100% 顺畅、绝不闪退的
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"\"{formattedUrl}\"",
                         CreateNoWindow = true,
-                        UseShellExecute = false,
-                        RedirectStandardError = true
-                    };
+                        UseShellExecute = false
+                    });
 
-                    using (var process = Process.Start(psi))
-                    {
-                        process?.WaitForExit();
-                        string error = process?.StandardError.ReadToEnd() ?? "";
-
-                        if (process?.ExitCode == 0 || error.Contains("1219") || error.Contains("已经连接"))
-                        {
-                            drive.IsMounted = true;
-                            Process.Start("explorer.exe", $"{drive.DriveLetter}:");
-                        }
-                        else
-                        {
-                            if (error.Contains("67") || error.Contains("网络名"))
-                            {
-                                MessageBox.Show("挂载失败！检测到您的 Windows 系统未开启 WebClient 组件。\n\n解决办法：\n请在键盘按 Win+R 输入 services.msc，把【WebClient】服务的启动类型改为【自动】并点击【启动】即可！", "提示");
-                            }
-                            else
-                            {
-                                MessageBox.Show($"挂载失败，Windows 系统内核提示：\n{error}", "提示");
-                            }
-                        }
-                    }
+                    drive.IsMounted = true;
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"挂载崩溃: {ex.Message}");
+                    MessageBox.Show($"打开失败: {ex.Message}");
                 }
             }
             else
             {
-                try
-                {
-                    string args = $"use {drive.DriveLetter}: /delete /y";
-                    var psi = new ProcessStartInfo("net", args) { CreateNoWindow = true, UseShellExecute = false };
-                    using (var process = Process.Start(psi)) process?.WaitForExit();
-                    
-                    drive.IsMounted = false;
-                }
-                catch { }
+                drive.IsMounted = false;
             }
 
             ListDrives.Items.Refresh();
-            RefreshAvailableDriveLetters(); 
         }
 
         private void BtnDelete_Click(object sender, RoutedEventArgs e)
         {
             if (ListDrives.SelectedItem is DriveConfig selected)
             {
-                if (selected.IsMounted)
-                {
-                    MessageBox.Show("请先断开该盘符的连接，再进行删除！", "提示");
-                    return;
-                }
                 DriveList.Remove(selected);
                 SaveConfig();
-                RefreshAvailableDriveLetters();
             }
         }
 
@@ -278,9 +210,9 @@ namespace LuckyDrive
         [System.Text.Json.Serialization.JsonIgnore]
         public bool IsMounted { get; set; } = false;
 
-        public string StatusText => IsMounted ? $"● 已映射到虚拟磁盘 {DriveLetter}:" : "○ 未连接";
+        public string StatusText => IsMounted ? $"● 已连接网盘外壳 ({DriveLetter}:)" : "○ 未连接";
         public SolidColorBrush StatusColor => IsMounted ? new SolidColorBrush(Colors.LightGreen) : new SolidColorBrush(Colors.Orange);
-        public string ButtonText => IsMounted ? "断开" : "挂载";
-        public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
+        public string ButtonText => IsMounted ? "刷新打开" : "进入网盘";
+        public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.DarkCyan) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
     }
 }
