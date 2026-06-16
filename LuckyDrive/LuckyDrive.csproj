@@ -10,6 +10,8 @@
     
     <AssemblyName>LuckyDriveApp</AssemblyName>
     <RootNamespace>LuckyDrive</RootNamespace>
+    
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
