@@ -1,8 +1,7 @@
 <Window x:Class="LuckyDrive.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml"
-        Title="LuckyDrive - 纯绿色多网盘卡片挂载器" Height="650" Width="1000"
-        WindowStartupLocation="CenterScreen" Background="#F3F3F3">
+        Title="LuckyDrive - 纯绿色多网盘卡片挂载器" Height="650" Width="1000" WindowStartupLocation="CenterScreen" Background="#F3F3F3">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="380"/>
@@ -10,8 +9,8 @@
         </Grid.ColumnDefinitions>
 
         <Border Background="White" Grid.Column="0" Padding="25">
-            <StackPanel SpatialElementAlignment="Top">
-                <TextBlock Text="添加网盘卡片" FontSize="20" FontStyle="Normal" FontWeight="Bold" Margin="0,0,0,20"/>
+            <StackPanel>
+                <TextBlock Text="添加网盘卡片" FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
 
                 <TextBlock Text="网盘自定义名称:" Margin="0,0,0,5" Foreground="#666666"/>
                 <TextBox x:Name="TxtName" Height="35" Margin="0,0,0,15" VerticalContentAlignment="Center" Padding="5"/>
@@ -35,7 +34,7 @@
         <Grid Grid.Column="1" Margin="25">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Width="*"/>
+                <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="我的 Lucky 网盘群" FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
