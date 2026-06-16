@@ -5,7 +5,6 @@ using Fsp;
 
 namespace LuckyDrive
 {
-    // 👇 继承自 FileSystemBase 核心驱动类
     public class LuckyWebDavFileSystem : FileSystemBase
     {
         private readonly string _url;
@@ -18,8 +17,8 @@ namespace LuckyDrive
             _authHeader = "Basic " + Convert.ToBase64String(rawToken);
         }
 
-        // 👇 1. 对齐标准的 Read 接口签名
-        public override int Read(object fileDesc, IntPtr buffer, long offset, uint length, out uint bytesRead)
+        // 👇 1. 严格对齐：使用 nint 替代 IntPtr，完美契合基类虚方法
+        public override int Read(object fileDesc, nint buffer, long offset, uint length, out uint bytesRead)
         {
             string fileName = (string)fileDesc;
             bytesRead = 0;
@@ -61,17 +60,16 @@ namespace LuckyDrive
             }
         }
 
-        // 👇 2. 终极对齐：使用 FileSystemVolumeInfo 替代旧版的 VolumeInfo
-        public override int GetVolumeInfo(out FileSystemVolumeInfo volumeInfo)
+        // 👇 2. 严格对齐：显式指定 Fsp.VolumeInfo 命名空间，大小写和结构体彻底锁死
+        public override int GetVolumeInfo(out Fsp.VolumeInfo volumeInfo)
         {
             volumeInfo = default;
-            volumeInfo.TotalSize = 50UL * 1024 * 1024 * 1024; // 伪装 50GB
+            volumeInfo.TotalSize = 50UL * 1024 * 1024 * 1024;
             volumeInfo.FreeSize = 25UL * 1024 * 1024 * 1024;
-            // 最新版 WinFsp.Net 移除了 volumeInfo.SetVolumeLabel，直接在外面用 Host 挂载时指定标签更稳妥
             return STATUS_SUCCESS;
         }
 
-        // 👇 3. 对齐标准的 Open 接口签名
+        // 👇 3. 严格对齐：Open 签名参数
         public override int Open(string fileName, uint createOptions, uint grantedAccess, out object fileDesc)
         {
             fileDesc = fileName;
