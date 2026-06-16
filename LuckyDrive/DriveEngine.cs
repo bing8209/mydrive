@@ -17,8 +17,8 @@ namespace LuckyDrive
             _authHeader = "Basic " + Convert.ToBase64String(rawToken);
         }
 
-        // 1. 严格对齐最新版核心：nint 缓冲区、uint 长度
-        public override int Read(object fileDesc, nint buffer, long offset, uint length, out uint bytesRead)
+        // 👇 1. 终极对齐：官方最新定义中，buffer 依然保持 IntPtr，但 fileDesc 必须是不带可空标记的纯 object
+        public override int Read(object fileDesc, IntPtr buffer, long offset, uint length, out uint bytesRead)
         {
             string fileName = (string)fileDesc;
             bytesRead = 0;
@@ -52,7 +52,7 @@ namespace LuckyDrive
                         }
                     }
                 }
-                return STATUS_SUCCESS; // 网络读取空或结束也属于成功
+                return STATUS_SUCCESS;
             }
             catch
             {
@@ -60,19 +60,19 @@ namespace LuckyDrive
             }
         }
 
-        // 2. 严格对齐最新版底层 Interop 空间下的卷结构体
+        // 👇 2. 完美过关的卷信息（保持不动）
         public override int GetVolumeInfo(out Fsp.Interop.VolumeInfo volumeInfo)
         {
             volumeInfo = default;
-            volumeInfo.TotalSize = 100UL * 1024 * 1024 * 1024; // 固定的 100GB 虚拟驱动盘
+            volumeInfo.TotalSize = 100UL * 1024 * 1024 * 1024; // 100GB
             volumeInfo.FreeSize = 50UL * 1024 * 1024 * 1024;
             return STATUS_SUCCESS;
         }
 
-        // 3. 严格对齐最新版 Open 签名，支持非托管对象映射
-        public override int Open(string fileName, uint createOptions, uint grantedAccess, out object? fileDesc)
+        // 👇 3. 终极对齐：官方接口中最后一个参数的名字必须叫 fileDescription，且必须是 object 类型
+        public override int Open(string fileName, uint createOptions, uint grantedAccess, out object fileDescription)
         {
-            fileDesc = fileName;
+            fileDescription = fileName;
             return STATUS_SUCCESS;
         }
     }
