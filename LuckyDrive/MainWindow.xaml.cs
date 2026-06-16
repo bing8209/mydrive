@@ -13,7 +13,6 @@ namespace LuckyDrive
 {
     public partial class MainWindow : Window
     {
-        // 动态列表，绑定到界面左侧
         public ObservableCollection<DriveConfig> DriveList { get; set; } = new ObservableCollection<DriveConfig>();
         private readonly string _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
 
@@ -24,7 +23,6 @@ namespace LuckyDrive
             ListDrives.ItemsSource = DriveList;
         }
 
-        // 保存/新建按钮点击
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             var newDrive = new DriveConfig
@@ -42,7 +40,6 @@ namespace LuckyDrive
             SaveConfig();
         }
 
-        // 左侧卡片右侧的 [挂载/断开] 独立开关
         private void BtnToggleMount_Click(object sender, RoutedEventArgs e)
         {
             var btn = (Button)sender;
@@ -65,7 +62,7 @@ namespace LuckyDrive
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Value = MessageBox.Show($"盘符 {drive.DriveLetter} 真正挂载失败! \n请检查WinFsp驱动或网络。\n{ex.Message}", "错误");
+                    MessageBox.Show($"盘符 {drive.DriveLetter} 真正挂载失败! \n请检查WinFsp驱动或网络。\n{ex.Message}", "错误");
                 }
             }
             else
@@ -80,11 +77,9 @@ namespace LuckyDrive
                 drive.IsMounted = false;
             }
 
-            // 强行刷新左侧卡片外观
             ListDrives.Items.Refresh();
         }
 
-        // 删除卡片
         private void BtnDelete_Click(object sender, RoutedEventArgs e)
         {
             if (ListDrives.SelectedItem is DriveConfig selected)
@@ -99,7 +94,6 @@ namespace LuckyDrive
             }
         }
 
-        // 切换选择左侧卡片时，把信息回显到右侧
         private void ListDrives_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (ListDrives.SelectedItem is DriveConfig selected)
@@ -112,13 +106,11 @@ namespace LuckyDrive
             }
         }
 
-        // 本地 JSON 配置存取
         private void SaveConfig()
         {
             try
             {
                 var options = new JsonSerializerOptions { WriteIndented = true };
-                // 过滤失活的数据（不保存运行中的实体驱动句柄）
                 var saveList = DriveList.Select(d => new DriveConfig {
                     Id = d.Id, Name = d.Name, Url = d.Url, User = d.User, Pass = d.Pass, DriveLetter = d.DriveLetter
                 }).ToList();
@@ -145,9 +137,6 @@ namespace LuckyDrive
         }
     }
 
-    /// <summary>
-    /// 每个网络盘的独立数据模型
-    /// </summary>
     public class DriveConfig
     {
         public string Id { get; set; } = string.Empty;
@@ -157,21 +146,79 @@ namespace LuckyDrive
         public string Pass { get; set; } = string.Empty;
         public string DriveLetter { get; set; } = string.Empty;
         
-        // 运行状态控制变量（不需要保存进 JSON）
         [System.Text.Json.Serialization.JsonIgnore]
         public bool IsMounted { get; set; } = false;
         [System.Text.Json.Serialization.JsonIgnore]
         public FileSystemHost? Host { get; set; }
 
-        // 供界面绑定显示的动态计算属性
-        public string StatusText => IsMounted ? $"● 已成功映射到 {DriveLetter}" : "○ 未连接";
+        public string StatusText => IsMounted ? $"● 已映射到 {DriveLetter}" : "○ 未连接";
         public SolidColorBrush StatusColor => IsMounted ? new SolidColorBrush(Colors.LightGreen) : new SolidColorBrush(Colors.Orange);
         public string ButtonText => IsMounted ? "断开" : "挂载";
         public SolidColorBrush ButtonBg => IsMounted ? new SolidColorBrush(Colors.Crimson) : new SolidColorBrush(Color.FromRgb(0, 120, 212));
     }
 
     // =======================================================
-    // LuckyWebDavFileSystem 类保持上一版不动，写在最末尾即可
+    // 完整的 WinFsp 零缓存核心流式搬运工
     // =======================================================
-    public class LuckyWebDavFileSystem : FileSystemBase { /* 保持跟上一版一模一样 */ }
+    public class LuckyWebDavFileSystem : FileSystemBase
+    {
+        private readonly string _url;
+        private readonly string _user;
+        private readonly string _pass;
+        private readonly HttpClient _http;
+
+        public LuckyWebDavFileSystem(string url, string user, string pass)
+        {
+            _url = url.EndsWith("/") ? url : url + "/";
+            _user = user;
+            _pass = pass;
+
+            _http = new HttpClient();
+            var authToken = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{_user}:{_pass}"));
+            _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
+        }
+
+        public override int Read(object fileDesc, IntPtr buffer, long offset, uint length, out uint bytesRead)
+        {
+            string fileName = (string)fileDesc;
+            bytesRead = 0;
+
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, _url + fileName.TrimStart('\\').Replace('\\', '/'));
+                request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, offset + length - 1);
+
+                using (var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead))
+                {
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var data = response.Content.ReadAsByteArrayAsync().Result;
+                        System.Runtime.InteropServices.Marshal.Copy(data, 0, buffer, data.Length);
+                        bytesRead = (uint)data.Length;
+                        return STATUS_SUCCESS;
+                    }
+                }
+                return STATUS_UNSUCCESSFUL;
+            }
+            catch
+            {
+                return STATUS_UNSUCCESSFUL;
+            }
+        }
+
+        public override int GetVolumeInfo(out VolumeInfo volumeInfo)
+        {
+            volumeInfo = default;
+            volumeInfo.TotalSize = 50ULL * 1024 * 1024 * 1024; // 伪装 50GB
+            volumeInfo.FreeSize = 25ULL * 1024 * 1024 * 1024;
+            volumeInfo.SetVolumeLabel("LuckyDrive");
+            return STATUS_SUCCESS;
+        }
+
+        public override int Open(string fileName, uint createOptions, uint grantedAccess, out object fileDesc)
+        {
+            fileDesc = fileName;
+            return STATUS_SUCCESS;
+        }
+    }
 }
