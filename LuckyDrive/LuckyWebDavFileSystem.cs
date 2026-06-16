@@ -1,6 +1,6 @@
 using System;
-using System.Net.Http;
-using System.Threading.Tasks;
+using System.IO;
+using System.Net;
 using Fsp;
 
 namespace LuckyDrive
@@ -10,7 +10,7 @@ namespace LuckyDrive
         private readonly string _url;
         private readonly string _user;
         private readonly string _pass;
-        private readonly HttpClient _http;
+        private readonly string _authHeader;
 
         public LuckyWebDavFileSystem(string url, string user, string pass)
         {
@@ -18,56 +18,64 @@ namespace LuckyDrive
             _user = user;
             _pass = pass;
 
-            _http = new HttpClient();
-            var authToken = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{_user}:{_pass}"));
-            _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
+            // 提前计算好认证 Token，避免运行时重复计算
+            var rawToken = System.Text.Encoding.UTF8.GetBytes($"{_user}:{_pass}");
+            _authHeader = "Basic " + Convert.ToBase64String(rawToken);
         }
 
+        // 👇 终极改造：使用纯同步流式搬运，彻底消灭引发编译器玄学罢工的 Task/Async 嵌套
         public override int Read(object fileDesc, IntPtr buffer, long offset, uint length, out uint bytesRead)
         {
             string fileName = (string)fileDesc;
-            uint tempBytesRead = 0;
+            bytesRead = 0;
 
-            // 👇 终极修复：在外面把所有数学计算、类型转换全部做完！
-            long rangeStart = offset;
-            long rangeEnd = offset + (long)length - 1;
-            string targetUrl = _url + fileName.TrimStart('\\').Replace('\\', '/');
-
-            int result = Task.Run(async () =>
+            try
             {
-                try
-                {
-                    var request = new HttpRequestMessage(HttpMethod.Get, targetUrl);
-                    
-                    // 👇 这里变成纯数字变量传递，再也没有任何括号和转换，彻底杜绝编译器误判
-                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(rangeStart, rangeEnd);
+                string targetUrl = _url + fileName.TrimStart('\\').Replace('\\', '/');
+                
+                // 1. 创建标准的同步 HTTP 请求
+                var request = (HttpWebRequest)WebRequest.Create(targetUrl);
+                request.Method = "GET";
+                request.Headers["Authorization"] = _authHeader;
+                
+                // 2. 注入 Range 头：Windows 读多少，我们精准要多少
+                long rangeEnd = offset + (long)length - 1;
+                request.AddRange(offset, rangeEnd);
 
-                    using (var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+                // 3. 同步获取网络响应（100% 阻塞当前系统线程，WinFsp 原生推荐这样干）
+                using (var response = (HttpWebResponse)request.GetResponse())
+                {
+                    if (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.PartialContent)
                     {
-                        if (response.IsSuccessStatusCode)
+                        using (var responseStream = response.GetResponseStream())
+                        using (var ms = new MemoryStream())
                         {
-                            var data = await response.Content.ReadAsByteArrayAsync();
-                            System.Runtime.InteropServices.Marshal.Copy(data, 0, buffer, data.Length);
-                            tempBytesRead = (uint)data.Length;
-                            return STATUS_SUCCESS;
+                            // 4. 同步将网络流抽干到本地内存数组
+                            responseStream.CopyTo(ms);
+                            byte[] data = ms.ToArray();
+
+                            if (data.Length > 0)
+                            {
+                                // 5. 零缓存直接写入 Windows 系统缓冲区
+                                System.Runtime.InteropServices.Marshal.Copy(data, 0, buffer, data.Length);
+                                bytesRead = (uint)data.Length;
+                                return STATUS_SUCCESS;
+                            }
                         }
                     }
-                    return STATUS_UNSUCCESSFUL;
                 }
-                catch
-                {
-                    return STATUS_UNSUCCESSFUL;
-                }
-            }).GetAwaiter().GetResult();
-
-            bytesRead = tempBytesRead;
-            return result;
+                return STATUS_UNSUCCESSFUL;
+            }
+            catch
+            {
+                return STATUS_UNSUCCESSFUL;
+            }
         }
 
         public override int GetVolumeInfo(out VolumeInfo volumeInfo)
         {
             volumeInfo = default;
-            volumeInfo.TotalSize = 50ULL * 1024 * 1024 * 1024;
+            volumeInfo.TotalSize = 50ULL * 1024 * 1024 * 1024; // 50GB
             volumeInfo.FreeSize = 25ULL * 1024 * 1024 * 1024;
             volumeInfo.SetVolumeLabel("LuckyDrive");
             return STATUS_SUCCESS;
