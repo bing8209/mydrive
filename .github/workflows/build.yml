@@ -23,8 +23,9 @@ jobs:
     - name: Restore Dependencies
       run: dotnet restore LuckyDrive.sln
 
-    - name: Publish Single File Exe
+    - name: Clean and Publish Single File Exe
       run: |
+        dotnet clean LuckyDrive/LuckyDrive.csproj -c Release -r win-x64
         dotnet publish LuckyDrive/LuckyDrive.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
 
     - name: Compress Release Artifact
