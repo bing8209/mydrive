@@ -28,13 +28,19 @@ namespace LuckyDrive
             string fileName = (string)fileDesc;
             uint tempBytesRead = 0;
 
+            // 👇 终极修复：在外面把所有数学计算、类型转换全部做完！
+            long rangeStart = offset;
+            long rangeEnd = offset + (long)length - 1;
+            string targetUrl = _url + fileName.TrimStart('\\').Replace('\\', '/');
+
             int result = Task.Run(async () =>
             {
                 try
                 {
-                    string targetUrl = _url + fileName.TrimStart('\\').Replace('\\', '/');
                     var request = new HttpRequestMessage(HttpMethod.Get, targetUrl);
-                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, offset + (long)length - 1);
+                    
+                    // 👇 这里变成纯数字变量传递，再也没有任何括号和转换，彻底杜绝编译器误判
+                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(rangeStart, rangeEnd);
 
                     using (var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
                     {
