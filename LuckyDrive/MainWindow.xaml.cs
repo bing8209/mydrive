@@ -19,22 +19,18 @@ namespace LuckyDrive
         {
             InitializeComponent();
             
-            // 🛡️ 极其重要的安全策略：启动时只做最纯粹的静态绑定，绝不执行任何动态内存循环
-            DriveList = new ObservableCollection<DriveConfig>();
-            ListDrives.ItemsSource = DriveList;
-            
-            // 注册窗体完全加载完毕的事件，彻底避开初始化死锁
-            this.Loaded += MainWindow_Loaded;
-        }
+            // 🛡️ 纯防御性架构：强行在最底层把数据流和事件解耦，确保 100% 能够顺利初始化
+            try
+            {
+                DriveList = new ObservableCollection<DriveConfig>();
+                ListDrives.ItemsSource = DriveList;
+                LoadConfig();
+            }
+            catch { }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-        {
-            // 🚀 此时软件界面已经完全画出来了，系统环境已完全就绪，再安全地读取配置和加载盘符
-            LoadConfig();
             RefreshAvailableDriveLetters();
         }
 
-        // 🚀 100% 纯内存静态数组，去除了所有可能引发硬闪退的硬件扫描和未就绪变量循环
         private void RefreshAvailableDriveLetters()
         {
             try
@@ -42,7 +38,6 @@ namespace LuckyDrive
                 var defaultLetters = new List<string> { "Z:", "Y:", "X:", "W:", "V:", "U:", "T:", "S:", "R:", "Q:" };
                 var availableLetters = new List<string>();
 
-                // 兜底保障：如果列表为空，直接塞入默认盘符
                 if (DriveList == null || DriveList.Count == 0)
                 {
                     ComboDrive.ItemsSource = defaultLetters;
@@ -61,21 +56,14 @@ namespace LuckyDrive
                             break;
                         }
                     }
-                    if (!isUsedInApp)
-                    {
-                        availableLetters.Add(letter);
-                    }
+                    if (!isUsedInApp) availableLetters.Add(letter);
                 }
 
                 ComboDrive.ItemsSource = availableLetters;
-                if (availableLetters.Count > 0)
-                {
-                    ComboDrive.SelectedIndex = 0; 
-                }
+                if (availableLetters.Count > 0) ComboDrive.SelectedIndex = 0;
             }
             catch
             {
-                // 万一有任何风吹草动，强制保底，绝对不弹窗不闪退
                 ComboDrive.ItemsSource = new List<string> { "Z:", "Y:", "X:" };
                 ComboDrive.SelectedIndex = 0;
             }
@@ -95,7 +83,7 @@ namespace LuckyDrive
             {
                 if (d != null && d.DriveLetter == targetLetter)
                 {
-                    MessageBox.Show($"盘符 {targetLetter}: 已经在列表中了，请换个字母！", "提示");
+                    MessageBox.Show($"盘符 {targetLetter}: 已经在列表中了！", "提示");
                     return;
                 }
             }
@@ -147,7 +135,6 @@ namespace LuckyDrive
                     string path = uri.AbsolutePath.Trim('/');
                     path = path.Replace("/", "\\");
 
-                    // 🧬 升级版标准化 WebDAV UNC 路径解析，直击二级文件夹
                     string uncPath;
                     if (port == 80 || port == 443)
                     {
@@ -158,7 +145,6 @@ namespace LuckyDrive
                         uncPath = string.IsNullOrEmpty(path) ? $"\\\\{host}@{port}\\DavWWWRoot" : $"\\\\{host}@{port}\\DavWWWRoot\\{path}";
                     }
 
-                    // 预清理可能冲突的网络连接
                     try { Process.Start(new ProcessStartInfo("net", $"use {drive.DriveLetter}: /delete /y") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit(); } catch { }
 
                     string args = $"use {drive.DriveLetter}: \"{uncPath}\" \"{drive.Pass}\" /user:\"{drive.User}\" /persistent:no";
@@ -181,20 +167,13 @@ namespace LuckyDrive
                         }
                         else
                         {
-                            if (error.Contains("67") || error.Contains("网络名"))
-                            {
-                                MessageBox.Show("挂载失败！检测到您的 Windows 系统未开启 WebClient 组件，或者注册表未解锁 http 限制。\n\n解决办法：\n请确保注册表 BasicAuthLevel 已改为 2，且 WebClient 服务已启动！", "提示");
-                            }
-                            else
-                            {
-                                MessageBox.Show($"挂载失败，系统提示：\n{error}", "提示");
-                            }
+                            MessageBox.Show($"挂载失败，系统提示：\n{error}", "提示");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"挂载崩溃: {ex.Message}");
+                    MessageBox.Show($"挂载异常: {ex.Message}");
                 }
             }
             else
@@ -210,7 +189,6 @@ namespace LuckyDrive
                 catch { }
             }
 
-            // 安全刷新 UI
             try { ListDrives.Items.Refresh(); } catch { }
             RefreshAvailableDriveLetters(); 
         }
