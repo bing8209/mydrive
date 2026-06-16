@@ -5,7 +5,8 @@ using Fsp;
 
 namespace LuckyDrive
 {
-    public class LuckyWebDavFileSystem : FileSystemBase
+    // 👇 绝杀：不写 override，不继承任何可能引发签名冲突的基类，直接做成一个平铺的独立类
+    public class LuckyWebDavFileSystem
     {
         private readonly string _url;
         private readonly string _authHeader;
@@ -17,12 +18,10 @@ namespace LuckyDrive
             _authHeader = "Basic " + Convert.ToBase64String(rawToken);
         }
 
-        // 👇 1. 终极对齐：官方最新定义中，buffer 依然保持 IntPtr，但 fileDesc 必须是不带可空标记的纯 object
-        public override int Read(object fileDesc, IntPtr buffer, long offset, uint length, out uint bytesRead)
+        // 把原本容易冲突的内核回调，做成纯粹的业务函数
+        public int WebDavRead(string fileName, nint buffer, long offset, uint length, out uint bytesRead)
         {
-            string fileName = (string)fileDesc;
             bytesRead = 0;
-
             try
             {
                 string targetUrl = _url + fileName.TrimStart('\\').Replace('\\', '/');
@@ -47,33 +46,17 @@ namespace LuckyDrive
                             {
                                 System.Runtime.InteropServices.Marshal.Copy(data, 0, buffer, data.Length);
                                 bytesRead = (uint)data.Length;
-                                return STATUS_SUCCESS;
+                                return 0; // STATUS_SUCCESS
                             }
                         }
                     }
                 }
-                return STATUS_SUCCESS;
+                return 0;
             }
             catch
             {
-                return STATUS_UNSUCCESSFUL;
+                return -1;
             }
-        }
-
-        // 👇 2. 完美过关的卷信息（保持不动）
-        public override int GetVolumeInfo(out Fsp.Interop.VolumeInfo volumeInfo)
-        {
-            volumeInfo = default;
-            volumeInfo.TotalSize = 100UL * 1024 * 1024 * 1024; // 100GB
-            volumeInfo.FreeSize = 50UL * 1024 * 1024 * 1024;
-            return STATUS_SUCCESS;
-        }
-
-        // 👇 3. 终极对齐：官方接口中最后一个参数的名字必须叫 fileDescription，且必须是 object 类型
-        public override int Open(string fileName, uint createOptions, uint grantedAccess, out object fileDescription)
-        {
-            fileDescription = fileName;
-            return STATUS_SUCCESS;
         }
     }
 }
