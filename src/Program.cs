@@ -204,8 +204,8 @@ namespace MountTool
                         cacheArgs = $" --cache-dir \"{cacheDir}\"";
                     }
 
-                    // 核心参数升级：加入了 10分钟超时、5G总容量上限的智能滚动清理逻辑
-                    string arguments = $"mount :webdav: {targetDrive} --webdav-url \"{url}\" --webdav-user \"{user}\" --webdav-pass \"{obscuredPass}\" --vfs-cache-mode full --vfs-cache-max-age 10m --vfs-cache-max-size 5G --volname \"{volName}\"{cacheArgs} --network-mode";
+                    // 【方案一代码】关闭本地缓存，进度条100%真实，走完即传完
+                    string arguments = $"mount :webdav: {targetDrive} --webdav-url \"{url}\" --webdav-user \"{user}\" --webdav-pass \"{obscuredPass}\" --vfs-cache-mode off --volname \"{volName}\" --network-mode";
 
                     ProcessStartInfo psi = new ProcessStartInfo(rclonePath, arguments) {
                         WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false
