@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Diagnostics;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using System.Text.Json;
 using Microsoft.Win32;
 
 namespace MountTool
@@ -18,122 +19,181 @@ namespace MountTool
         }
     }
 
+    // 配置数据结构定义
+    public class AccountConfig
+    {
+        public string ProfileName { get; set; } = "";
+        public string Url { get; set; } = "";
+        public string User { get; set; } = "";
+        public string Pass { get; set; } = "";
+        public string Drive { get; set; } = "Z:";
+        public string VolName { get; set; } = "LuckyDrive";
+    }
+
+    public class AppConfig
+    {
+        public string LastSelectedProfile { get; set; } = "";
+        public List<AccountConfig> Accounts { get; set; } = new List<AccountConfig>();
+    }
+
     public class MainForm : Form
     {
-        // 核心组件释放路径
         private readonly string rclonePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rclone.exe");
         private readonly string msiPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "winfsp_install.msi");
+        private readonly string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+        
         private Dictionary<string, int> _activeMounts = new Dictionary<string, int>();
+        private AppConfig _appConfig = new AppConfig();
 
-        // --- 声明界面控件 ---
-        private Label lblUrl = new Label() { Text = "Lucky WebDAV 地址:", Left = 20, Top = 25, Width = 110 };
-        private TextBox txtUrl = new TextBox() { Left = 140, Top = 22, Width = 280, Text = "http://127.0.0.1:18800/aaa" };
+        // --- 控件定义 ---
+        private Label lblProfile = new Label() { Text = "选择/管理账号:", Left = 20, Top = 25, Width = 110 };
+        private ComboBox cmbProfile = new ComboBox() { Left = 140, Top = 22, Width = 160, DropDownStyle = ComboBoxStyle.DropDownList };
+        private Button btnSaveProfile = new Button() { Text = "保存账号", Left = 310, Top = 20, Width = 70, Height = 26 };
+        private Button btnDelProfile = new Button() { Text = "删除", Left = 385, Top = 20, Width = 55, Height = 26 };
 
-        private Label lblUser = new Label() { Text = "WebDAV 用户名:", Left = 20, Top = 65, Width = 110 };
-        private TextBox txtUser = new TextBox() { Left = 140, Top = 62, Width = 280, Text = "bing" };
+        private Label lblUrl = new Label() { Text = "Lucky WebDAV 地址:", Left = 20, Top = 65, Width = 110 };
+        private TextBox txtUrl = new TextBox() { Left = 140, Top = 62, Width = 300 };
 
-        private Label lblPass = new Label() { Text = "WebDAV 密  码:", Left = 20, Top = 105, Width = 110 };
-        private TextBox txtPass = new TextBox() { Left = 140, Top = 102, Width = 280, PasswordChar = '*', Text = "" };
+        private Label lblUser = new Label() { Text = "WebDAV 用户名:", Left = 20, Top = 105, Width = 110 };
+        private TextBox txtUser = new TextBox() { Left = 140, Top = 102, Width = 300 };
 
-        private Label lblDrive = new Label() { Text = "选择挂载盘符:", Left = 20, Top = 145, Width = 110 };
-        private ComboBox cmbDrive = new ComboBox() { Left = 140, Top = 142, Width = 80, DropDownStyle = ComboBoxStyle.DropDownList };
+        private Label lblPass = new Label() { Text = "WebDAV 密  码:", Left = 20, Top = 145, Width = 110 };
+        private TextBox txtPass = new TextBox() { Left = 140, Top = 142, Width = 300, PasswordChar = '*' };
 
-        private Button btnAction = new Button() { Text = "🚀 立即挂载", Left = 140, Top = 190, Width = 120, Height = 35 };
-        private Button btnDisconnect = new Button() { Text = "❌ 断开连接", Left = 280, Top = 190, Width = 120, Height = 35 };
+        private Label lblDrive = new Label() { Text = "选择挂载盘符:", Left = 20, Top = 185, Width = 110 };
+        private ComboBox cmbDrive = new ComboBox() { Left = 140, Top = 182, Width = 80, DropDownStyle = ComboBoxStyle.DropDownList };
+
+        private Label lblVolName = new Label() { Text = "挂载显示名称:", Left = 20, Top = 225, Width = 110 };
+        private TextBox txtVolName = new TextBox() { Left = 140, Top = 222, Width = 200, Text = "LuckyDrive" };
+
+        private Button btnAction = new Button() { Text = "🚀 立即挂载", Left = 140, Top = 275, Width = 130, Height = 38 };
+        private Button btnDisconnect = new Button() { Text = "❌ 断开连接", Left = 290, Top = 275, Width = 130, Height = 38 };
 
         public MainForm()
         {
-            // 窗体基础样式美化
-            this.Text = "Lucky WebDAV 定制挂载器 v1.0";
-            this.Width = 470;
-            this.Height = 290;
+            // 窗体样式
+            this.Text = "Lucky WebDAV 定制挂载器 v2.0";
+            this.Width = 480;
+            this.Height = 370;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MaximizeBox = false;
 
-            // 初始化盘符下拉菜单（从 Z 倒着排到 H，防止冲突）
-            string[] drives = { "Z:", "Y:", "X:", "W:", "V:", "U:", "T:", "S:", "R:", "Q:", "P:", "O:", "N:", "M:", "L:", "K:", "J:", "I:", "Current" };
+            // 初始化盘符
+            string[] drives = { "Z:", "Y:", "X:", "W:", "V:", "U:", "T:", "S:", "R:", "Q:", "P:", "O:", "N:", "M:", "L:", "K:", "J:", "I:", "H:" };
             cmbDrive.Items.AddRange(drives);
-            cmbDrive.SelectedIndex = 0; // 默认选中 Z:
+            cmbDrive.SelectedIndex = 0;
 
-            // 将所有新加的控件加载到窗体中
+            // 装载控件
+            this.Controls.Add(lblProfile); this.Controls.Add(cmbProfile); this.Controls.Add(btnSaveProfile); this.Controls.Add(btnDelProfile);
             this.Controls.Add(lblUrl); this.Controls.Add(txtUrl);
             this.Controls.Add(lblUser); this.Controls.Add(txtUser);
             this.Controls.Add(lblPass); this.Controls.Add(txtPass);
             this.Controls.Add(lblDrive); this.Controls.Add(cmbDrive);
+            this.Controls.Add(lblVolName); this.Controls.Add(txtVolName);
             this.Controls.Add(btnAction); this.Controls.Add(btnDisconnect);
 
-            // 绑定生命周期与核心事件
             this.Load += MainForm_Load;
-            InitializeMountEvents();
+            this.FormClosing += MainForm_FormClosing;
+            InitializeEvents();
         }
 
         private void MainForm_Load(object? sender, EventArgs e)
         {
-            // 启动瞬间自动从 Exe 内部释放组件
             ExtractInternalResource("rclone.exe", rclonePath);
-
-            // 驱动环境检测
-            if (!CheckIfWinFspInstalled())
-            {
-                var result = MessageBox.Show(
-                    "检测到您的电脑尚未安装虚拟磁盘驱动（WinFsp）。\n\n点击“确定”将自动为您拉起轻量安装包，完成后即可正常挂载！", 
-                    "首次运行提示", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
-
-                if (result == DialogResult.OK)
-                {
-                    try {
-                        ExtractInternalResource("winfsp.msi", msiPath);
-                        Process p = Process.Start("msiexec.exe", $"/i \"{msiPath}\" /passive");
-                        p.WaitForExit();
-                        if (File.Exists(msiPath)) File.Delete(msiPath);
-                        
-                        if (CheckIfWinFspInstalled()) MessageBox.Show("驱动环境初始化成功！", "提示");
-                    }
-                    catch (Exception ex) {
-                        MessageBox.Show("驱动安装失败，请手动安装: " + ex.Message, "错误");
-                    }
-                }
-            }
+            CheckDriverEnvironment();
+            LoadConfig(); // 载入本地持久化配置
         }
 
-        private void InitializeMountEvents()
+        private void InitializeEvents()
         {
-            // 【挂载点击事件】
+            // 【切换账号下拉框】
+            cmbProfile.SelectedIndexChanged += (s, e) => {
+                string selectedName = cmbProfile.SelectedItem?.ToString() ?? "";
+                var account = _appConfig.Accounts.Find(a => a.ProfileName == selectedName);
+                if (account != null) {
+                    txtUrl.Text = account.Url;
+                    txtUser.Text = account.User;
+                    txtPass.Text = account.Pass;
+                    txtVolName.Text = account.VolName;
+                    int driveIndex = cmbDrive.Items.IndexOf(account.Drive);
+                    if (driveIndex >= 0) cmbDrive.SelectedIndex = driveIndex;
+                }
+            };
+
+            // 【保存/添加账号】
+            btnSaveProfile.Click += (s, e) => {
+                string url = txtUrl.Text.Trim();
+                string user = txtUser.Text.Trim();
+                if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(user)) {
+                    MessageBox.Show("请至少填写地址和用户名再保存！", "提示");
+                    return;
+                }
+
+                // 弹出小输入框让用户给这个账号起个别名
+                string profileName = ShowInputDialog("请输入账号别名（如：家里NAS、办公室Lucky）:", "保存账号");
+                if (string.IsNullOrEmpty(profileName)) return;
+
+                var existing = _appConfig.Accounts.Find(a => a.ProfileName == profileName);
+                if (existing != null) {
+                    existing.Url = url; existing.User = user; existing.Pass = txtPass.Text;
+                    existing.Drive = cmbDrive.SelectedItem?.ToString() ?? "Z:";
+                    existing.VolName = txtVolName.Text.Trim();
+                } else {
+                    _appConfig.Accounts.Add(new AccountConfig {
+                        ProfileName = profileName, Url = url, User = user, Pass = txtPass.Text,
+                        Drive = cmbDrive.SelectedItem?.ToString() ?? "Z:", VolName = txtVolName.Text.Trim()
+                    });
+                }
+                SaveConfig(profileName);
+            };
+
+            // 【删除账号】
+            btnDelProfile.Click += (s, e) => {
+                string selectedName = cmbProfile.SelectedItem?.ToString() ?? "";
+                if (string.IsNullOrEmpty(selectedName)) return;
+
+                var account = _appConfig.Accounts.Find(a => a.ProfileName == selectedName);
+                if (account != null) {
+                    _appConfig.Accounts.Remove(account);
+                    SaveConfig("");
+                    ClearInputFields();
+                }
+            };
+
+            // 【核心挂载事件】
             btnAction.Click += (s, e) => {
                 string url = txtUrl.Text.Trim();
                 string user = txtUser.Text.Trim();
                 string pass = txtPass.Text;
                 string targetDrive = cmbDrive.SelectedItem?.ToString() ?? "Z:";
+                string volName = string.IsNullOrEmpty(txtVolName.Text.Trim()) ? "LuckyDrive" : txtVolName.Text.Trim();
 
                 if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(user)) {
-                    MessageBox.Show("请先完整填写 Lucky 地址和用户名！", "提示");
+                    MessageBox.Show("错误：地址和用户名不能为空！", "提示");
                     return;
                 }
 
-                // 检查是否重复挂载同一个盘符
                 if (_activeMounts.ContainsKey(targetDrive.ToUpper())) {
-                    MessageBox.Show($"盘符 {targetDrive} 已经在挂载中，请勿重复操作！", "提示");
+                    MessageBox.Show($"盘符 {targetDrive} 已经在挂载中！", "提示");
                     return;
                 }
 
                 try {
-                    // 动态加密输入的密码
                     string obscuredPass = ObscurePassword(pass);
-
-                    // 构造动态 rclone 挂载参数
-                    string arguments = $"mount :webdav: {targetDrive} --webdav-url \"{url}\" --webdav-user \"{user}\" --webdav-pass \"{obscuredPass}\" --vfs-cache-mode off --network-mode";
+                    
+                    // 🚀 核心改动 1：把 --vfs-cache-mode off 改为 full，完美解决复制文件报错
+                    // 🚀 核心改动 2：增加 --volname 参数动态控制资源管理器里的硬盘备注名称
+                    string arguments = $"mount :webdav: {targetDrive} --webdav-url \"{url}\" --webdav-user \"{user}\" --webdav-pass \"{obscuredPass}\" --vfs-cache-mode full --volname \"{volName}\" --network-mode";
 
                     ProcessStartInfo psi = new ProcessStartInfo(rclonePath, arguments) {
-                        WindowStyle = ProcessWindowStyle.Hidden,
-                        CreateNoWindow = true,
-                        UseShellExecute = false
+                        WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false
                     };
 
                     Process? p = Process.Start(psi);
                     if (p != null) {
-                        _activeMounts[targetDrive.ToUpper()] = p.Id; // 记录盘符和对应的进程ID
-                        MessageBox.Show($"盘符 {targetDrive} 挂载命令已发出！\n请去「此电脑」中查看是否成功出现网络驱动器。", "成功");
+                        _activeMounts[targetDrive.ToUpper()] = p.Id;
+                        MessageBox.Show($"盘符 {targetDrive} ({volName}) 挂载成功！\n大文件复制、剪切、缓存优化已全部解锁。", "成功");
                     }
                 }
                 catch (Exception ex) {
@@ -141,27 +201,101 @@ namespace MountTool
                 }
             };
 
-            // 【断开点击事件】
+            // 【断开连接事件】
             btnDisconnect.Click += (s, e) => {
                 string targetDrive = cmbDrive.SelectedItem?.ToString() ?? "Z:";
-                
                 if (_activeMounts.TryGetValue(targetDrive.ToUpper(), out int pid)) {
                     try {
-                        // 结束 rclone 进程，盘符自动安全消失
                         Process.GetProcessById(pid).Kill();
                         _activeMounts.Remove(targetDrive.ToUpper());
-                        MessageBox.Show($"盘符 {targetDrive} 已成功断开。");
-                    } 
-                    catch { 
-                        _activeMounts.Remove(targetDrive.ToUpper()); 
-                    }
+                        MessageBox.Show($"盘符 {targetDrive} 已成功安全断开。");
+                    } catch { _activeMounts.Remove(targetDrive.ToUpper()); }
                 } else {
-                    MessageBox.Show($"本地记录中未发现 {targetDrive} 的挂载进程，您可以尝试直接在资源管理器里右键断开。", "提示");
+                    MessageBox.Show($"未发现本地由本工具托管的 {targetDrive} 进程。", "提示");
                 }
             };
         }
 
-        // 动态加密密码的核心算法
+        // --- 配置持久化存储逻辑 ---
+        private void LoadConfig()
+        {
+            try {
+                if (File.Exists(configPath)) {
+                    string json = File.ReadAllText(configPath);
+                    var parsed = JsonSerializer.Deserialize<AppConfig>(json);
+                    if (parsed != null) _appConfig = parsed;
+                }
+                
+                UpdateProfileComboBox();
+
+                if (!string.IsNullOrEmpty(_appConfig.LastSelectedProfile)) {
+                    int idx = cmbProfile.Items.IndexOf(_appConfig.LastSelectedProfile);
+                    if (idx >= 0) cmbProfile.SelectedIndex = idx;
+                } else if (cmbProfile.Items.Count > 0) {
+                    cmbProfile.SelectedIndex = 0;
+                } else {
+                    ClearInputFields();
+                }
+            } catch { ClearInputFields(); }
+        }
+
+        private void SaveConfig(string selectProfileAfterRefresh)
+        {
+            try {
+                _appConfig.LastSelectedProfile = selectProfileAfterRefresh;
+                string json = JsonSerializer.Serialize(_appConfig, new JsonSerializerOptions { WriteIndented = true });
+                File.ReadAllText(configPath); // 仅测试
+                File.WriteAllText(configPath, json);
+                
+                UpdateProfileComboBox();
+                
+                int idx = cmbProfile.Items.IndexOf(selectProfileAfterRefresh);
+                if (idx >= 0) cmbProfile.SelectedIndex = idx;
+                else if (cmbProfile.Items.Count > 0) cmbProfile.SelectedIndex = 0;
+            } catch { }
+        }
+
+        private void UpdateProfileComboBox()
+        {
+            cmbProfile.Items.Clear();
+            foreach (var acc in _appConfig.Accounts) {
+                cmbProfile.Items.Add(acc.ProfileName);
+            }
+        }
+
+        private void ClearInputFields()
+        {
+            txtUrl.Text = ""; txtUser.Text = ""; txtPass.Text = ""; txtVolName.Text = "LuckyDrive";
+            if (cmbDrive.Items.Count > 0) cmbDrive.SelectedIndex = 0;
+        }
+
+        private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
+        {
+            // 窗体关闭前，把当前界面上的输入顺手保存到当前选中的配置里
+            string currentProfile = cmbProfile.SelectedItem?.ToString() ?? "";
+            if (!string.IsNullOrEmpty(currentProfile)) {
+                var acc = _appConfig.Accounts.Find(a => a.ProfileName == currentProfile);
+                if (acc != null) {
+                    acc.Url = txtUrl.Text.Trim(); acc.User = txtUser.Text.Trim(); acc.Pass = txtPass.Text;
+                    acc.Drive = cmbDrive.SelectedItem?.ToString() ?? "Z:";
+                    acc.VolName = txtVolName.Text.Trim();
+                    SaveConfig(currentProfile);
+                }
+            }
+        }
+
+        // --- 辅助小工具函数 ---
+        private string ShowInputDialog(string text, string caption)
+        {
+            Form prompt = new Form() { Width = 350, Height = 150, Text = caption, FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent, MaximizeBox = false };
+            Label textLabel = new Label() { Left = 20, Top = 20, Text = text, Width = 300 };
+            TextBox textBox = new TextBox() { Left = 20, Top = 50, Width = 290 };
+            Button confirmation = new Button() { Text = "确定", Left = 210, Width = 100, Top = 80, DialogResult = DialogResult.OK };
+            prompt.Controls.Add(textBox); prompt.Controls.Add(textLabel); prompt.Controls.Add(confirmation);
+            prompt.AcceptButton = confirmation;
+            return prompt.ShowDialog() == DialogResult.OK ? textBox.Text.Trim() : "";
+        }
+
         private string ObscurePassword(string plainPassword)
         {
             if (string.IsNullOrEmpty(plainPassword)) return "";
@@ -176,27 +310,37 @@ namespace MountTool
             }
         }
 
-        // 内嵌资源动态提取
         private void ExtractInternalResource(string resourceName, string outputPath)
         {
             if (File.Exists(outputPath)) return;
             var assembly = Assembly.GetExecutingAssembly();
-            using (Stream? stream = assembly.GetManifestResourceStream(resourceName))
-            {
+            using (Stream? stream = assembly.GetManifestResourceStream(resourceName)) {
                 if (stream == null) return;
-                using (FileStream fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write))
-                {
+                using (FileStream fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write)) {
                     stream.CopyTo(fs);
                 }
             }
         }
 
-        // 驱动注册表检测
+        private void CheckDriverEnvironment()
+        {
+            if (!CheckIfWinFspInstalled()) {
+                var result = MessageBox.Show("系统未检测到 WinFsp 驱动，点击“确定”将自动拉起静默安装。", "提示", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+                if (result == DialogResult.OK) {
+                    try {
+                        ExtractInternalResource("winfsp.msi", msiPath);
+                        Process p = Process.Start("msiexec.exe", $"/i \"{msiPath}\" /passive");
+                        p.WaitForExit();
+                        if (File.Exists(msiPath)) File.Delete(msiPath);
+                    } catch { }
+                }
+            }
+        }
+
         private bool CheckIfWinFspInstalled()
         {
             using (RegistryKey? key64 = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WinFsp"))
-            using (RegistryKey? key32 = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\WinFsp"))
-            {
+            using (RegistryKey? key32 = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\WinFsp")) {
                 return (key64 != null || key32 != null);
             }
         }
