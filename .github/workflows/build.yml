@@ -5,10 +5,30 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      # =================【 新增：打包前动态抓取底层依赖 】=================
+      - name: Download Bootstrapped Dependencies
+        shell: pwsh
+        run: |
+          # 1. 在你的 src 目录下创建 Resources 临时文件夹
+          New-Item -ItemType Directory -Force -Path .\src\Resources
+          
+          # 2. 下载并解压最新的 rclone.exe 到指定位置
+          Invoke-WebRequest -Uri "https://downloads.rclone.org/rclone-current-windows-amd64.zip" -OutFile "rclone.zip"
+          Expand-Archive -Path "rclone.zip" -DestinationPath "rclone_extracted"
+          Get-ChildItem -Path "rclone_extracted" -Filter "rclone.exe" -Recurse | Copy-Item -Destination ".\src\Resources\rclone.exe"
+          
+          # 3. 下载稳定版 WinFsp 驱动包
+          Invoke-WebRequest -Uri "https://github.com/winfsp/winfsp/releases/download/v2.0/winfsp-2.0.23075.msi" -OutFile ".\src\Resources\winfsp.msi"
+          
+          Write-Host "依赖文件下载成功，已对齐到 .\src\Resources 目录！"
+
+      # =================【 保持不变：执行编译打包 】=================
       - name: Build
         run: |
           cd src
           dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o output
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
