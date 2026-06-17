@@ -19,7 +19,6 @@ namespace MountTool
         }
     }
 
-    // 单个账号的配置模型
     public class AccountConfig
     {
         public string ProfileName { get; set; } = "";
@@ -27,11 +26,10 @@ namespace MountTool
         public string User { get; set; } = "";
         public string Pass { get; set; } = "";
         public string Drive { get; set; } = "Z:";
-        public string VolName { get; set; } = "LuckyDrive";
-        public string CacheDir { get; set; } = ""; // 新增：自定义缓存目录
+        public string VolName { get; set; } = "CBDrive";
+        public string CacheDir { get; set; } = "";
     }
 
-    // 全局持久化模型
     public class AppConfig
     {
         public string LastSelectedProfile { get; set; } = "";
@@ -47,13 +45,14 @@ namespace MountTool
         private Dictionary<string, int> _activeMounts = new Dictionary<string, int>();
         private AppConfig _appConfig = new AppConfig();
 
-        // --- 界面布局控件 ---
+        // --- 界面控件 ---
         private Label lblProfile = new Label() { Text = "选择/管理账号:", Left = 20, Top = 25, Width = 110 };
         private ComboBox cmbProfile = new ComboBox() { Left = 140, Top = 22, Width = 160, DropDownStyle = ComboBoxStyle.DropDownList };
         private Button btnSaveProfile = new Button() { Text = "保存账号", Left = 310, Top = 20, Width = 70, Height = 26 };
         private Button btnDelProfile = new Button() { Text = "删除", Left = 385, Top = 20, Width = 55, Height = 26 };
 
-        private Label lblUrl = new Label() { Text = "Lucky WebDAV 地址:", Left = 20, Top = 65, Width = 110 };
+        // 完美更名：Lucky WebDAV -> CB Drive
+        private Label lblUrl = new Label() { Text = "CB Drive 地址:", Left = 20, Top = 65, Width = 110 };
         private TextBox txtUrl = new TextBox() { Left = 140, Top = 62, Width = 300 };
 
         private Label lblUser = new Label() { Text = "WebDAV 用户名:", Left = 20, Top = 105, Width = 110 };
@@ -62,12 +61,10 @@ namespace MountTool
         private Label lblPass = new Label() { Text = "WebDAV 密  码:", Left = 20, Top = 145, Width = 110 };
         private TextBox txtPass = new TextBox() { Left = 140, Top = 142, Width = 300, PasswordChar = '*' };
 
-        // 紧凑行：盘符 + 挂载名称
         private Label lblDrive = new Label() { Text = "盘符与显示名称:", Left = 20, Top = 185, Width = 110 };
         private ComboBox cmbDrive = new ComboBox() { Left = 140, Top = 182, Width = 65, DropDownStyle = ComboBoxStyle.DropDownList };
-        private TextBox txtVolName = new TextBox() { Left = 215, Top = 182, Width = 225, Text = "LuckyDrive" };
+        private TextBox txtVolName = new TextBox() { Left = 215, Top = 182, Width = 225, Text = "CBDrive" };
 
-        // 新增行：自定义缓存目录
         private Label lblCacheDir = new Label() { Text = "自定义缓存目录:", Left = 20, Top = 225, Width = 110 };
         private TextBox txtCacheDir = new TextBox() { Left = 140, Top = 222, Width = 235 };
         private Button btnBrowseCache = new Button() { Text = "浏览...", Left = 385, Top = 220, Width = 55, Height = 26 };
@@ -77,20 +74,18 @@ namespace MountTool
 
         public MainForm()
         {
-            // 基础窗体属性设置
-            this.Text = "Lucky WebDAV 定制挂载器 v3.0";
+            // 完美更名标题
+            this.Text = "CB Drive 定制挂载器 v4.0";
             this.Width = 480;
             this.Height = 365;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MaximizeBox = false;
 
-            // 初始化可选盘符
             string[] drives = { "Z:", "Y:", "X:", "W:", "V:", "U:", "T:", "S:", "R:", "Q:", "P:", "O:", "N:", "M:", "L:", "K:", "J:", "I:", "H:" };
             cmbDrive.Items.AddRange(drives);
             cmbDrive.SelectedIndex = 0;
 
-            // 装载所有控件
             this.Controls.Add(lblProfile); this.Controls.Add(cmbProfile); this.Controls.Add(btnSaveProfile); this.Controls.Add(btnDelProfile);
             this.Controls.Add(lblUrl); this.Controls.Add(txtUrl);
             this.Controls.Add(lblUser); this.Controls.Add(txtUser);
@@ -108,12 +103,12 @@ namespace MountTool
         {
             ExtractInternalResource("rclone.exe", rclonePath);
             CheckDriverEnvironment();
-            LoadConfig(); // 载入本地配置
+            LoadConfig();
         }
 
         private void InitializeEvents()
         {
-            // 【切换账号下拉菜单】
+            // 【切换账号】
             cmbProfile.SelectedIndexChanged += (s, e) => {
                 string selectedName = cmbProfile.SelectedItem?.ToString() ?? "";
                 var account = _appConfig.Accounts.Find(a => a.ProfileName == selectedName);
@@ -128,7 +123,7 @@ namespace MountTool
                 }
             };
 
-            // 【新增/保存当前账号】
+            // 【保存账号】
             btnSaveProfile.Click += (s, e) => {
                 string url = txtUrl.Text.Trim();
                 string user = txtUser.Text.Trim();
@@ -137,7 +132,7 @@ namespace MountTool
                     return;
                 }
 
-                string profileName = ShowInputDialog("请输入账号别名（如：家里NAS、办公室Lucky）:", "保存账号");
+                string profileName = ShowInputDialog("请输入账号别名（如：家里NAS、办公室CB）:", "保存账号");
                 if (string.IsNullOrEmpty(profileName)) return;
 
                 var existing = _appConfig.Accounts.Find(a => a.ProfileName == profileName);
@@ -154,10 +149,12 @@ namespace MountTool
                     });
                 }
                 SaveConfig(profileName);
-                MessageBox.Show($"账号「{profileName}」已成功保存！", "成功");
+                
+                // 精简通知
+                MessageBox.Show("保存成功", "提示");
             };
 
-            // 【删除选中的账号】
+            // 【删除账号】
             btnDelProfile.Click += (s, e) => {
                 string selectedName = cmbProfile.SelectedItem?.ToString() ?? "";
                 if (string.IsNullOrEmpty(selectedName)) return;
@@ -170,23 +167,23 @@ namespace MountTool
                 }
             };
 
-            // 【浏览选取本地缓存文件夹】
+            // 【浏览缓存目录】
             btnBrowseCache.Click += (s, e) => {
                 using (FolderBrowserDialog fbd = new FolderBrowserDialog()) {
-                    fbd.Description = "请选择网络盘的本地缓存目录（建议选择剩余空间较大的高速固态硬盘分区）";
+                    fbd.Description = "请选择本地缓存目录";
                     if (fbd.ShowDialog() == DialogResult.OK) {
                         txtCacheDir.Text = fbd.SelectedPath;
                     }
                 }
             };
 
-            // 【核心挂载执行】
+            // 【立即挂载】
             btnAction.Click += (s, e) => {
                 string url = txtUrl.Text.Trim();
                 string user = txtUser.Text.Trim();
                 string pass = txtPass.Text;
                 string targetDrive = cmbDrive.SelectedItem?.ToString() ?? "Z:";
-                string volName = string.IsNullOrEmpty(txtVolName.Text.Trim()) ? "LuckyDrive" : txtVolName.Text.Trim();
+                string volName = string.IsNullOrEmpty(txtVolName.Text.Trim()) ? "CBDrive" : txtVolName.Text.Trim();
                 string cacheDir = txtCacheDir.Text.Trim();
 
                 if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(user)) {
@@ -202,14 +199,13 @@ namespace MountTool
                 try {
                     string obscuredPass = ObscurePassword(pass);
                     
-                    // 动态组装自定义缓存路径参数
                     string cacheArgs = "";
                     if (!string.IsNullOrEmpty(cacheDir) && Directory.Exists(cacheDir)) {
                         cacheArgs = $" --cache-dir \"{cacheDir}\"";
                     }
 
-                    // 执行高性能挂载命令
-                    string arguments = $"mount :webdav: {targetDrive} --webdav-url \"{url}\" --webdav-user \"{user}\" --webdav-pass \"{obscuredPass}\" --vfs-cache-mode full --volname \"{volName}\"{cacheArgs} --network-mode";
+                    // 核心参数升级：加入了 10分钟超时、5G总容量上限的智能滚动清理逻辑
+                    string arguments = $"mount :webdav: {targetDrive} --webdav-url \"{url}\" --webdav-user \"{user}\" --webdav-pass \"{obscuredPass}\" --vfs-cache-mode full --vfs-cache-max-age 10m --vfs-cache-max-size 5G --volname \"{volName}\"{cacheArgs} --network-mode";
 
                     ProcessStartInfo psi = new ProcessStartInfo(rclonePath, arguments) {
                         WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false
@@ -218,7 +214,9 @@ namespace MountTool
                     Process? p = Process.Start(psi);
                     if (p != null) {
                         _activeMounts[targetDrive.ToUpper()] = p.Id;
-                        MessageBox.Show($"挂载指令已发出！\n盘符: {targetDrive}\n名称: {volName}\n已启用高性能全缓存托管模式。", "挂载成功");
+                        
+                        // 精简通知
+                        MessageBox.Show("挂载成功", "提示");
                     }
                 }
                 catch (Exception ex) {
@@ -233,7 +231,9 @@ namespace MountTool
                     try {
                         Process.GetProcessById(pid).Kill();
                         _activeMounts.Remove(targetDrive.ToUpper());
-                        MessageBox.Show($"盘符 {targetDrive} 已成功安全断开。");
+                        
+                        // 精简通知
+                        MessageBox.Show("断开成功", "提示");
                     } catch { _activeMounts.Remove(targetDrive.ToUpper()); }
                 } else {
                     MessageBox.Show($"未发现由本工具托管的 {targetDrive} 挂载进程。", "提示");
@@ -241,7 +241,6 @@ namespace MountTool
             };
         }
 
-        // --- 配置序列化持久化控制 ---
         private void LoadConfig()
         {
             try {
@@ -269,7 +268,7 @@ namespace MountTool
             try {
                 _appConfig.LastSelectedProfile = selectProfileAfterRefresh;
                 string json = JsonSerializer.Serialize(_appConfig, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(configPath, json); // 彻底修复：移除了引发 FileNotFoundException 的 Read 操作
+                File.WriteAllText(configPath, json);
                 
                 UpdateProfileComboBox();
                 
@@ -298,13 +297,12 @@ namespace MountTool
         private void ClearInputFields()
         {
             txtUrl.Text = ""; txtUser.Text = ""; txtPass.Text = ""; 
-            txtVolName.Text = "LuckyDrive"; txtCacheDir.Text = "";
+            txtVolName.Text = "CBDrive"; txtCacheDir.Text = "";
             if (cmbDrive.Items.Count > 0) cmbDrive.SelectedIndex = 0;
         }
 
         private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
-            // 关闭软件前自动把界面上的改动无感保存入当前的账号别名中
             string currentProfile = cmbProfile.SelectedItem?.ToString() ?? "";
             if (!string.IsNullOrEmpty(currentProfile)) {
                 var acc = _appConfig.Accounts.Find(a => a.ProfileName == currentProfile);
@@ -319,7 +317,6 @@ namespace MountTool
             }
         }
 
-        // --- 核心辅助小工具 ---
         private string ShowInputDialog(string text, string caption)
         {
             Form prompt = new Form() { Width = 350, Height = 150, Text = caption, FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent, MaximizeBox = false };
