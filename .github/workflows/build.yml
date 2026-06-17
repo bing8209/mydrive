@@ -1,9 +1,4 @@
-name: Build EXE
-
-# 修改这里：将 on: [push] 改为 workflow_dispatch
-on: 
-  workflow_dispatch:
-
+- name: Build
         run: |
           # 1. 创建一个新的控制台项目
           dotnet new console -n MyMountTool
