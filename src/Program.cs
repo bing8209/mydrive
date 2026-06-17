@@ -11,7 +11,23 @@ namespace MountTool {
 
     static class Program {
         [STAThread]
-        static void Main() {
+        static void Main(string[] args) {
+            // 开机自动静默挂载逻辑
+            if (args.Length > 0 && args[0] == "auto") {
+                string cfg = "config.json";
+                if (File.Exists(cfg)) {
+                    var list = JsonSerializer.Deserialize<List<Account>>(File.ReadAllText(cfg));
+                    if (list != null) foreach (var a in list) {
+                        if (string.IsNullOrEmpty(a.Url)) continue;
+                        string target = string.IsNullOrEmpty(a.Drive) ? "*" : (a.Drive.EndsWith(":") ? a.Drive : a.Drive + ":");
+                        ProcessStartInfo psi = new ProcessStartInfo("net.exe", $"use {target} {a.Url} /user:{a.User} {a.Pass} /persistent:no") { WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false };
+                        Process.Start(psi);
+                    }
+                }
+                return; // 执行完毕直接退出，不显示界面
+            }
+
+            // 界面逻辑
             Application.EnableVisualStyles();
             Form f = new Form { Text = "多账号 WebDAV 挂载器", Size = new Size(580, 400), StartPosition = FormStartPosition.CenterScreen };
 
@@ -23,7 +39,6 @@ namespace MountTool {
             dgv.Columns.Add(passCol);
             dgv.Columns.Add("Drive", "盘符(如U:)");
 
-            // 密码显示为星号
             dgv.CellFormatting += (s, e) => { if (dgv.Columns[e.ColumnIndex].Name == "Pass" && e.Value != null) { e.Value = new string('*', e.Value.ToString().Length); e.FormattingApplied = true; } };
 
             Button btnSave = new Button { Text = "保存列表", Top = 250, Left = 10, Width = 170 };
@@ -46,39 +61,25 @@ namespace MountTool {
                 MessageBox.Show("保存成功！");
             };
 
-            // 连接按钮逻辑
             btnAction.Click += (s, e) => {
                 var row = dgv.CurrentRow;
                 if (row == null || row.IsNewRow) return;
-                
                 string drv = row.Cells[4].Value?.ToString()?.Trim() ?? "";
                 string url = row.Cells[1].Value?.ToString()?.Trim() ?? "";
                 string user = row.Cells[2].Value?.ToString()?.Trim() ?? "";
                 string pass = row.Cells[3].Value?.ToString()?.Trim() ?? "";
-                
                 string target = string.IsNullOrEmpty(drv) ? "*" : (drv.EndsWith(":") ? drv : drv + ":");
-                
-                ProcessStartInfo psi = new ProcessStartInfo("net.exe", $"use {target} {url} /user:{user} {pass} /persistent:no") { 
-                    WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false 
-                };
-                
+                ProcessStartInfo psi = new ProcessStartInfo("net.exe", $"use {target} {url} /user:{user} {pass} /persistent:no") { WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false };
                 Process.Start(psi);
-                // 移除 MessageBox 避免阻塞，用户点击后会瞬间执行完毕
             };
 
-            // 断开按钮逻辑
             btnDisconnect.Click += (s, e) => {
                 var row = dgv.CurrentRow;
                 if (row == null || row.IsNewRow) return;
-                
                 string drv = row.Cells[4].Value?.ToString()?.Trim() ?? "";
                 if (string.IsNullOrEmpty(drv)) { MessageBox.Show("请先在【盘符】列填写要断开的盘符(如 U:)"); return; }
-                
                 string target = drv.EndsWith(":") ? drv : drv + ":";
-                ProcessStartInfo psi = new ProcessStartInfo("net.exe", $"use {target} /delete /y") { 
-                    WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false 
-                };
-                
+                ProcessStartInfo psi = new ProcessStartInfo("net.exe", $"use {target} /delete /y") { WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false };
                 Process.Start(psi);
                 MessageBox.Show($"已尝试断开 {target}");
             };
