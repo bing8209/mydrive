@@ -27,7 +27,7 @@ namespace MountTool
         public string Pass { get; set; } = "";
         public string Drive { get; set; } = "Z:";
         public string VolName { get; set; } = "CBDrive";
-        public string CacheDir { get; set; } = ""; // 保留字段以兼容旧的config.json
+        public string CacheDir { get; set; } = "";
     }
 
     public class AppConfig
@@ -64,15 +64,18 @@ namespace MountTool
         private ComboBox cmbDrive = new ComboBox() { Left = 140, Top = 182, Width = 65, DropDownStyle = ComboBoxStyle.DropDownList };
         private TextBox txtVolName = new TextBox() { Left = 215, Top = 182, Width = 225, Text = "CBDrive" };
 
-        // 按钮顺势上移，界面更紧凑
-        private Button btnAction = new Button() { Text = "🚀 立即挂载", Left = 140, Top = 230, Width = 140, Height = 40 };
-        private Button btnDisconnect = new Button() { Text = "❌ 断开连接", Left = 300, Top = 230, Width = 140, Height = 40 };
+        private Label lblCacheDir = new Label() { Text = "自定义缓存目录:", Left = 20, Top = 225, Width = 110 };
+        private TextBox txtCacheDir = new TextBox() { Left = 140, Top = 222, Width = 235 };
+        private Button btnBrowseCache = new Button() { Text = "浏览...", Left = 385, Top = 220, Width = 55, Height = 26 };
+
+        private Button btnAction = new Button() { Text = "🚀 立即挂载", Left = 140, Top = 270, Width = 140, Height = 40 };
+        private Button btnDisconnect = new Button() { Text = "❌ 断开连接", Left = 300, Top = 270, Width = 140, Height = 40 };
 
         public MainForm()
         {
-            this.Text = "CB Drive 定制挂载器 v4.5";
+            this.Text = "CB Drive 定制挂载器 v4.6";
             this.Width = 480;
-            this.Height = 320; // 高度从365缩减至32
+            this.Height = 365;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MaximizeBox = false;
@@ -86,6 +89,7 @@ namespace MountTool
             this.Controls.Add(lblUser); this.Controls.Add(txtUser);
             this.Controls.Add(lblPass); this.Controls.Add(txtPass);
             this.Controls.Add(lblDrive); this.Controls.Add(cmbDrive); this.Controls.Add(txtVolName);
+            this.Controls.Add(lblCacheDir); this.Controls.Add(txtCacheDir); this.Controls.Add(btnBrowseCache);
             this.Controls.Add(btnAction); this.Controls.Add(btnDisconnect);
 
             this.Load += MainForm_Load;
@@ -111,6 +115,7 @@ namespace MountTool
                     txtUser.Text = account.User;
                     txtPass.Text = account.Pass;
                     txtVolName.Text = account.VolName;
+                    txtCacheDir.Text = account.CacheDir;
                     int driveIndex = cmbDrive.Items.IndexOf(account.Drive);
                     if (driveIndex >= 0) cmbDrive.SelectedIndex = driveIndex;
                 }
@@ -133,10 +138,12 @@ namespace MountTool
                     existing.Url = url; existing.User = user; existing.Pass = txtPass.Text;
                     existing.Drive = cmbDrive.SelectedItem?.ToString() ?? "Z:";
                     existing.VolName = txtVolName.Text.Trim();
+                    existing.CacheDir = txtCacheDir.Text.Trim();
                 } else {
                     _appConfig.Accounts.Add(new AccountConfig {
                         ProfileName = profileName, Url = url, User = user, Pass = txtPass.Text,
-                        Drive = cmbDrive.SelectedItem?.ToString() ?? "Z:", VolName = txtVolName.Text.Trim()
+                        Drive = cmbDrive.SelectedItem?.ToString() ?? "Z:", VolName = txtVolName.Text.Trim(),
+                        CacheDir = txtCacheDir.Text.Trim()
                     });
                 }
                 SaveConfig(profileName);
@@ -156,6 +163,16 @@ namespace MountTool
                 }
             };
 
+            // 【浏览缓存目录】
+            btnBrowseCache.Click += (s, e) => {
+                using (FolderBrowserDialog fbd = new FolderBrowserDialog()) {
+                    fbd.Description = "请选择本地缓存目录";
+                    if (fbd.ShowDialog() == DialogResult.OK) {
+                        txtCacheDir.Text = fbd.SelectedPath;
+                    }
+                }
+            };
+
             // 【立即挂载】
             btnAction.Click += (s, e) => {
                 string url = txtUrl.Text.Trim();
@@ -163,6 +180,7 @@ namespace MountTool
                 string pass = txtPass.Text;
                 string targetDrive = cmbDrive.SelectedItem?.ToString() ?? "Z:";
                 string volName = string.IsNullOrEmpty(txtVolName.Text.Trim()) ? "CBDrive" : txtVolName.Text.Trim();
+                string cacheDir = txtCacheDir.Text.Trim();
 
                 if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(user)) {
                     MessageBox.Show("错误：地址和用户名不能为空！", "提示");
@@ -177,8 +195,13 @@ namespace MountTool
                 try {
                     string obscuredPass = ObscurePassword(pass);
                     
-                    // 彻底闭坑的直通式参数，删除多余的缓存控制
-                    string arguments = $"mount :webdav: {targetDrive} --webdav-url \"{url}\" --webdav-user \"{user}\" --webdav-pass \"{obscuredPass}\" --vfs-cache-mode off --volname \"{volName}\" --network-mode";
+                    string cacheArgs = "";
+                    if (!string.IsNullOrEmpty(cacheDir) && Directory.Exists(cacheDir)) {
+                        cacheArgs = $" --cache-dir \"{cacheDir}\"";
+                    }
+
+                    // 【方案二核心参数】保留 full 高兼容性，但通过 --vfs-write-back 0s 让后台零延迟秒速开传
+                    string arguments = $"mount :webdav: {targetDrive} --webdav-url \"{url}\" --webdav-user \"{user}\" --webdav-pass \"{obscuredPass}\" --vfs-cache-mode full --vfs-cache-max-age 10m --vfs-cache-max-size 5G --vfs-write-back 0s --volname \"{volName}\"{cacheArgs} --network-mode";
 
                     ProcessStartInfo psi = new ProcessStartInfo(rclonePath, arguments) {
                         WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false
@@ -266,7 +289,7 @@ namespace MountTool
         private void ClearInputFields()
         {
             txtUrl.Text = ""; txtUser.Text = ""; txtPass.Text = ""; 
-            txtVolName.Text = "CBDrive";
+            txtVolName.Text = "CBDrive"; txtCacheDir.Text = "";
             if (cmbDrive.Items.Count > 0) cmbDrive.SelectedIndex = 0;
         }
 
@@ -279,6 +302,7 @@ namespace MountTool
                     acc.Url = txtUrl.Text.Trim(); acc.User = txtUser.Text.Trim(); acc.Pass = txtPass.Text;
                     acc.Drive = cmbDrive.SelectedItem?.ToString() ?? "Z:";
                     acc.VolName = txtVolName.Text.Trim();
+                    acc.CacheDir = txtCacheDir.Text.Trim();
                     _appConfig.LastSelectedProfile = currentProfile;
                     SaveConfigRaw();
                 }
