@@ -1,30 +1,38 @@
 using System;
-using System.Diagnostics;
+using System.Collections.Generic;
+using System.IO;
+using System.Web.Script.Serialization; // 记得引用 System.Web.Extensions
 using System.Windows.Forms;
 
 public partial class Form1 : Form
 {
-    private void btnMount_Click(object sender, EventArgs e)
-    {
-        // 从界面控件读取输入
-        string webdavUrl = txtUrl.Text;
-        string username = txtUser.Text;
-        string password = txtPass.Text;
-        string driveLetter = "Z:"; // 或者增加一个 txtDrive 控件
+    private string configPath = "accounts.json"; // 配置文件名
 
-        // 构建命令
-        string arguments = $"use {driveLetter} {webdavUrl} /user:{username} {password} /persistent:no";
-        
-        ProcessStartInfo psi = new ProcessStartInfo("net.exe", arguments);
-        psi.WindowStyle = ProcessWindowStyle.Hidden;
-        psi.UseShellExecute = false; // 必须设置为 false 才能成功隐藏黑框
-        psi.CreateNoWindow = true;   // 彻底不显示黑框
-        
-        try {
-            Process.Start(psi);
-            MessageBox.Show("成功挂载到 " + driveLetter);
-        } catch (Exception ex) {
-            MessageBox.Show("挂载失败: " + ex.Message);
+    private void Form1_Load(object sender, EventArgs e) {
+        // 读取 JSON 配置文件
+        if (File.Exists(configPath)) {
+            string json = File.ReadAllText(configPath);
+            dgvAccounts.DataSource = new JavaScriptSerializer().Deserialize<List<Account>>(json);
         }
+    }
+
+    private void btnSave_Click(object sender, EventArgs e) {
+        // 将表格数据转为 JSON 并保存
+        var list = (List<Account>)dgvAccounts.DataSource;
+        string json = new JavaScriptSerializer().Serialize(list);
+        File.WriteAllText(configPath, json);
+        MessageBox.Show("账号列表已更新！");
+    }
+
+    private void btnMount_Click(object sender, EventArgs e) {
+        // 获取当前选中的行
+        var row = dgvAccounts.CurrentRow;
+        if (row == null) return;
+        
+        string url = row.Cells["Url"].Value.ToString();
+        string user = row.Cells["User"].Value.ToString();
+        string pass = row.Cells["Pass"].Value.ToString();
+
+        // 挂载逻辑同前...
     }
 }
