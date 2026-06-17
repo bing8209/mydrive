@@ -4,22 +4,18 @@ name: Build EXE
 on: 
   workflow_dispatch:
 
-jobs:
-  build:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-      - name: Build
         run: |
+          # 1. 创建一个新的控制台项目
+          dotnet new console -n MyMountTool
+          # 2. 进入项目目录
+          cd MyMountTool
+          # 3. 覆盖写入核心逻辑代码
           echo 'using System.Diagnostics; public class Program { public static void Main() { Process.Start("net.exe", "use Z: https://你的地址 /user:账号 密码"); } }' > Program.cs
-          dotnet new console
+          # 4. 发布项目
           dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o output
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: MyWebDAVTool
-          path: output/*
+          # 5. 指向新的输出路径
+          path: MyMountTool/output/*
