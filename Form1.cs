@@ -1,23 +1,30 @@
+using System;
 using System.Diagnostics;
+using System.Windows.Forms;
 
 public partial class Form1 : Form
 {
-    // 这里写入你的 WebDAV 配置
-    private string webdavUrl = "https://你的WebDAV地址";
-    private string username = "你的账号";
-    private string password = "你的密码";
-    private string driveLetter = "Z:";
-
     private void btnMount_Click(object sender, EventArgs e)
     {
-        // 核心逻辑：利用 Windows 的 net use 命令，调用系统底层的 WebDAV 支持
-        // 这种方式不需要安装任何第三方臃肿客户端，不产生缓存，极其稳定
+        // 从界面控件读取输入
+        string webdavUrl = txtUrl.Text;
+        string username = txtUser.Text;
+        string password = txtPass.Text;
+        string driveLetter = "Z:"; // 或者增加一个 txtDrive 控件
+
+        // 构建命令
         string arguments = $"use {driveLetter} {webdavUrl} /user:{username} {password} /persistent:no";
         
         ProcessStartInfo psi = new ProcessStartInfo("net.exe", arguments);
-        psi.WindowStyle = ProcessWindowStyle.Hidden; // 隐藏运行黑框
-        Process.Start(psi);
+        psi.WindowStyle = ProcessWindowStyle.Hidden;
+        psi.UseShellExecute = false; // 必须设置为 false 才能成功隐藏黑框
+        psi.CreateNoWindow = true;   // 彻底不显示黑框
         
-        MessageBox.Show("网盘已挂载到 " + driveLetter);
+        try {
+            Process.Start(psi);
+            MessageBox.Show("成功挂载到 " + driveLetter);
+        } catch (Exception ex) {
+            MessageBox.Show("挂载失败: " + ex.Message);
+        }
     }
 }
