@@ -13,20 +13,22 @@ namespace MountTool {
         [STAThread]
         static void Main() {
             Application.EnableVisualStyles();
-            Form f = new Form { Text = "多账号 WebDAV 挂载器", Size = new Size(550, 380), StartPosition = FormStartPosition.CenterScreen };
+            Form f = new Form { Text = "多账号 WebDAV 挂载器", Size = new Size(580, 400), StartPosition = FormStartPosition.CenterScreen };
 
-            DataGridView dgv = new DataGridView { Top = 10, Left = 10, Width = 510, Height = 220, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AllowUserToAddRows = true };
+            DataGridView dgv = new DataGridView { Top = 10, Left = 10, Width = 540, Height = 220, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AllowUserToAddRows = true };
             dgv.Columns.Add("Name", "名称");
             dgv.Columns.Add("Url", "地址");
             dgv.Columns.Add("User", "账号");
-            dgv.Columns.Add("Pass", "密码");
-            dgv.Columns.Add("Drive", "指定盘符(如U:)"); // 新增盘符列
+            DataGridViewTextBoxColumn passCol = new DataGridViewTextBoxColumn { HeaderText = "密码", Name = "Pass" };
+            dgv.Columns.Add(passCol);
+            dgv.Columns.Add("Drive", "盘符(如U:)");
 
+            // 密码掩码：显示为星号
             dgv.CellFormatting += (s, e) => { if (dgv.Columns[e.ColumnIndex].Name == "Pass" && e.Value != null) { e.Value = new string('*', e.Value.ToString().Length); e.FormattingApplied = true; } };
 
-            Button btnSave = new Button { Text = "保存列表", Top = 240, Left = 10, Width = 160 };
-            Button btnAction = new Button { Text = "连接", Top = 240, Left = 180, Width = 160, BackColor = Color.LightGreen };
-            Button btnDisconnect = new Button { Text = "断开指定盘符", Top = 240, Left = 350, Width = 160, BackColor = Color.Salmon };
+            Button btnSave = new Button { Text = "保存列表", Top = 250, Left = 10, Width = 170 };
+            Button btnAction = new Button { Text = "连接", Top = 250, Left = 190, Width = 180, BackColor = Color.LightGreen };
+            Button btnDisconnect = new Button { Text = "断开指定盘符", Top = 250, Left = 380, Width = 170, BackColor = Color.Salmon };
 
             string cfg = "config.json";
             if (File.Exists(cfg)) {
@@ -41,33 +43,36 @@ namespace MountTool {
                     list.Add(new Account { Name = row.Cells[0].Value?.ToString() ?? "", Url = row.Cells[1].Value?.ToString() ?? "", User = row.Cells[2].Value?.ToString() ?? "", Pass = row.Cells[3].Value?.ToString() ?? "", Drive = row.Cells[4].Value?.ToString() ?? "" });
                 }
                 File.WriteAllText(cfg, JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true }));
-                MessageBox.Show("列表已保存。");
+                MessageBox.Show("保存成功");
             };
 
+            // 连接逻辑
             btnAction.Click += (s, e) => {
                 var row = dgv.CurrentRow;
                 if (row == null || row.IsNewRow) return;
-                string drv = row.Cells[4].Value?.ToString() ?? "";
-                string url = row.Cells[1].Value?.ToString() ?? "";
-                string user = row.Cells[2].Value?.ToString() ?? "";
-                string pass = row.Cells[3].Value?.ToString() ?? "";
+                string drv = row.Cells[4].Value?.ToString()?.Trim() ?? "";
+                string url = row.Cells[1].Value?.ToString()?.Trim() ?? "";
+                string user = row.Cells[2].Value?.ToString()?.Trim() ?? "";
+                string pass = row.Cells[3].Value?.ToString()?.Trim() ?? "";
                 
-                // 使用指定盘符
-                string target = string.IsNullOrEmpty(drv) ? "*" : drv;
+                // 确保盘符带冒号，如果未指定盘符则自动分配 (*)
+                string target = string.IsNullOrEmpty(drv) ? "*" : (drv.EndsWith(":") ? drv : drv + ":");
                 ProcessStartInfo psi = new ProcessStartInfo("net.exe", $"use {target} {url} /user:{user} {pass} /persistent:no") { WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false };
                 Process.Start(psi);
                 MessageBox.Show($"正在尝试挂载到 {target} ...");
             };
 
+            // 断开逻辑
             btnDisconnect.Click += (s, e) => {
                 var row = dgv.CurrentRow;
                 if (row == null || row.IsNewRow) return;
-                string drv = row.Cells[4].Value?.ToString() ?? "";
-                if (string.IsNullOrEmpty(drv)) { MessageBox.Show("请先在表格中填写要断开的盘符(如 U:)"); return; }
+                string drv = row.Cells[4].Value?.ToString()?.Trim() ?? "";
+                if (string.IsNullOrEmpty(drv)) { MessageBox.Show("请在【盘符】列填写如 U: 的内容"); return; }
+                string target = drv.EndsWith(":") ? drv : drv + ":";
 
-                ProcessStartInfo psi = new ProcessStartInfo("net.exe", $"use {drv} /delete /y") { WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false };
+                ProcessStartInfo psi = new ProcessStartInfo("net.exe", $"use {target} /delete /y") { WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false };
                 Process.Start(psi);
-                MessageBox.Show($"已尝试断开 {drv} 盘。");
+                MessageBox.Show($"已断开 {target}");
             };
 
             f.Controls.AddRange(new Control[] { dgv, btnSave, btnAction, btnDisconnect });
